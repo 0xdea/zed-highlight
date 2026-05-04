@@ -18,7 +18,11 @@ Zed-Highlight is a Language Server Protocol (LSP) extension for the [Zed](https:
 
 ## Features
 
-- TODO
+TODO
+
+- Toggle highlighting on and off for a selected word.
+- Remove all highlights with a single command.
+- Configurable highlight colors.
 
 ## Blog post
 
@@ -29,6 +33,7 @@ Zed-Highlight is a Language Server Protocol (LSP) extension for the [Zed](https:
 - <https://zed.dev/extensions>
 - <https://marketplace.visualstudio.com/items?itemName=debugpig.highlight>
 - <https://github.com/debugpig/vscode-extension-highlight>
+- <https://github.com/rsbondi/highlight-words>
 
 ## Installing
 
@@ -86,4 +91,9 @@ Tested with Zed 1.0.1 on:
 
 ## TODO
 
-- TODO
+TODO
+
+- Extensively test with both light and dark themes.
+- Add customizable settings (whole words, ignore case, etc.).
+- Add highlighting based on regular expressions.
+- Add sidebar for navigation between highlighted words.
