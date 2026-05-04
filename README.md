@@ -10,7 +10,7 @@
 
 > "Free as in use-after."
 >
-> -- @catsalad@infosec.exchange
+> -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
 
 Zed-Highlight is a Language Server Protocol (LSP) extension for the [Zed](https://zed.dev/) editor, designed to provide word highlighting. It is useful for quickly identifying all occurrences of selected words in the code, enhancing readability and navigation when tracing the program flow from input sources to potential vulnerability sinks.
 
