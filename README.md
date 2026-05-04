@@ -8,10 +8,9 @@
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
 [![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
 
-> "Nietzsche warned of gazing too long into the abyss.  
-> But he did not warn what happens when the abyss is a Makefile."
+> "Free as in use-after."
 >
-> -- @NotAShelf
+> -- @catsalad@infosec.exchange
 
 Zed-Highlight is a Language Server Protocol (LSP) extension for the [Zed](https://zed.dev/) editor, designed to provide word highlighting. It is useful for quickly identifying all occurrences of selected words in the code, enhancing readability and navigation when tracing the program flow from input sources to potential vulnerability sinks.
 
@@ -27,10 +26,13 @@ Zed-Highlight is a Language Server Protocol (LSP) extension for the [Zed](https:
 
 ## See also
 
+- <https://zed.dev/extensions>
 - <https://marketplace.visualstudio.com/items?itemName=debugpig.highlight>
 - <https://github.com/debugpig/vscode-extension-highlight>
 
 ## Installing
+
+TODO
 
 The easiest way to get the latest release is via [crates.io](https://crates.io/crates/zed-highlight):
 
@@ -46,6 +48,8 @@ cargo add zed-highlight
 
 ## Compiling
 
+TODO
+
 Alternatively, you can build from [source](https://github.com/0xdea/zed-highlight):
 
 ```sh
@@ -56,21 +60,9 @@ cargo build --release
 
 ## Usage
 
+TODO
+
 Run zed-highlight as follows:
-
-```sh
-TODO
-```
-
-## Examples
-
-TODO:
-
-```sh
-TODO
-```
-
-TODO:
 
 ```sh
 TODO
