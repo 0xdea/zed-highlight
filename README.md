@@ -3,7 +3,7 @@
 [![](https://img.shields.io/github/stars/0xdea/zed-highlight.svg?style=flat&color=yellow)](https://github.com/0xdea/zed-highlight)
 [![](https://img.shields.io/crates/v/zed-highlight?style=flat&color=green)](https://crates.io/crates/zed-highlight)
 [![](https://img.shields.io/crates/d/zed-highlight?style=flat&color=red)](https://crates.io/crates/zed-highlight)
-[![](https://img.shields.io/badge/zed-1.0.0-violet)](https://zed.dev/)
+[![](https://img.shields.io/badge/zed-1.0.1-violet)](https://zed.dev/)
 [![](https://img.shields.io/badge/twitter-%400xdea-blue.svg)](https://twitter.com/0xdea)
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
 [![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
@@ -78,12 +78,11 @@ TODO
 
 ## Compatibility
 
-Tested on:
+Tested with Zed 1.0.1 on:
 
-- Apple macOS Sequoia 15.2
-- Ubuntu Linux 24.04.2 LTS
-- Microsoft Windows 11 23H2
-- TODO
+- Apple macOS Tahoe 26.4.1
+- Ubuntu Linux 24.04.4 LTS - TODO
+- Microsoft Windows 11 23H2 - TODO
 
 ## Credits
 
