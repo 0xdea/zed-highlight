@@ -8,7 +8,7 @@
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
 [![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
 
-> "Nietzsche warned of gazing too long into the abyss.
+> "Nietzsche warned of gazing too long into the abyss.  
 > But he did not warn what happens when the abyss is a Makefile."
 >
 > -- @NotAShelf
