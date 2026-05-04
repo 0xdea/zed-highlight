@@ -3,17 +3,17 @@
 [![](https://img.shields.io/github/stars/0xdea/zed-highlight.svg?style=flat&color=yellow)](https://github.com/0xdea/zed-highlight)
 [![](https://img.shields.io/crates/v/zed-highlight?style=flat&color=green)](https://crates.io/crates/zed-highlight)
 [![](https://img.shields.io/crates/d/zed-highlight?style=flat&color=red)](https://crates.io/crates/zed-highlight)
-[![](https://img.shields.io/badge/todo-0.1.1-violet)](https://todo.com/)
+[![](https://img.shields.io/badge/zed-1.0.0-violet)](https://zed.dev/)
 [![](https://img.shields.io/badge/twitter-%400xdea-blue.svg)](https://twitter.com/0xdea)
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
 [![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
-[![doc](https://github.com/0xdea/zed-highlight/actions/workflows/doc.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/doc.yml)
 
-> "It's important to be quotable."
+> "Nietzsche warned of gazing too long into the abyss.
+> But he did not warn what happens when the abyss is a Makefile."
 >
-> -- Halvar Flake
+> -- @NotAShelf
 
-TODO
+Zed-Highlight is a Language Server Protocol (LSP) extension for the [Zed](https://zed.dev/) editor, designed to provide word highlighting. It is useful for quickly identifying all occurrences of selected words in the code, enhancing readability and navigation when tracing the program flow from input sources to potential vulnerability sinks.
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
@@ -27,7 +27,8 @@ TODO
 
 ## See also
 
-- TODO
+- https://marketplace.visualstudio.com/items?itemName=debugpig.highlight
+- https://github.com/debugpig/vscode-extension-highlight
 
 ## Installing
 
@@ -86,7 +87,7 @@ Tested on:
 
 ## Credits
 
-- TODO
+- [@debugpig](https://github.com/debugpig) for their useful [vscode-extension-highlight](https://github.com/debugpig/vscode-extension-highlight), which served as a major inspiration for this project.
 
 ## Changelog
 
