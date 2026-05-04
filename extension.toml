@@ -1,0 +1,41 @@
+id = "zed-highlight"
+name = "Zed-Highlight"
+description = "Highlight all occurrences of selected words with multiple cycling colors."
+version = "0.1.0"
+schema_version = 1
+authors = ["Marco Ivaldi <raptor@0xdeadbeef.info>"]
+
+[language_servers.zed-highlight]
+name = "Zed-Highlight"
+languages = [
+    "Bash",
+    "C",
+    "C++",
+    "CSS",
+    "Dockerfile",
+    "Elixir",
+    "Elm",
+    "Erlang",
+    "Go",
+    "HTML",
+    "Haskell",
+    "Java",
+    "JavaScript",
+    "JSON",
+    "Kotlin",
+    "Lua",
+    "Markdown",
+    "Plain Text",
+    "Python",
+    "Ruby",
+    "Rust",
+    "SQL",
+    "Scala",
+    "Shell Script",
+    "Swift",
+    "TOML",
+    "TSX",
+    "TypeScript",
+    "YAML",
+    "Zig",
+]
