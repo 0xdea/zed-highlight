@@ -27,8 +27,8 @@ Zed-Highlight is a Language Server Protocol (LSP) extension for the [Zed](https:
 
 ## See also
 
-- https://marketplace.visualstudio.com/items?itemName=debugpig.highlight
-- https://github.com/debugpig/vscode-extension-highlight
+- <https://marketplace.visualstudio.com/items?itemName=debugpig.highlight>
+- <https://github.com/debugpig/vscode-extension-highlight>
 
 ## Installing
 
