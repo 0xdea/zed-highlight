@@ -7,6 +7,11 @@ use std::fs;
 
 use zed_extension_api::{self as zed, LanguageServerId, Result};
 
+/// Repository slug used for GitHub release lookups and downloads.
+const REPOSITORY: &str = "0xdea/zed-highlight";
+/// Expected name of the language server binary.
+const BINARY_NAME: &str = "zed-highlight-lsp";
+
 /// Zed extension that allows to highlight all occurrences of selected words.
 struct ZedHighlightExtension {
     /// In-process cache of the resolved binary path. Avoids a redundant `fs::metadata` call on every
@@ -27,15 +32,14 @@ impl zed::Extension for ZedHighlightExtension {
     ///
     /// ## Errors
     ///
-    /// Returns an error if the language server binary cannot be found or downloaded.
+    /// Returns an error if the language server binary cannot be found locally or downloaded.
     fn language_server_command(
         &mut self,
         language_server_id: &LanguageServerId,
         worktree: &zed::Worktree,
     ) -> Result<zed::Command> {
-        // Local-first lookup. Prefer a locally installed binary (e.g., `cargo install --path lsp`)
-        // over downloading from GitHub, so dev builds work without a release.
-        if let Some(path) = worktree.which("zed-highlight-lsp") {
+        // Prefer a locally installed binary over downloading from GitHub, so dev builds work without a release.
+        if let Some(path) = worktree.which(BINARY_NAME) {
             return Ok(zed::Command {
                 command: path,
                 args: vec![],
@@ -43,8 +47,7 @@ impl zed::Extension for ZedHighlightExtension {
             });
         }
 
-        // Fall back to the GitHub release mechanism for users who don't have a local build.
-        // This also serves as the default installation method for non-developers.
+        // Fall back to the GitHub release mechanism for users who don't have a local build (e.g., non-developers).
         let binary_path = self.ensure_binary(language_server_id)?;
         Ok(zed::Command {
             command: binary_path,
@@ -66,34 +69,32 @@ impl ZedHighlightExtension {
     /// - No suitable prebuilt binary asset is found for the current platform.
     /// - The binary fails to download or extract.
     fn ensure_binary(&mut self, language_server_id: &LanguageServerId) -> Result<String> {
-        // Fast path: return the cached path if the file still exists on disk.
-        // The file could have been deleted by the user or an OS cleanup tool,
-        // so we verify with `fs::metadata` rather than trusting the cache blindly.
+        // Immediately return the cached path if the file still exists on disk.
         if let Some(ref path) = self.cached_binary_path
             && fs::metadata(path).is_ok_and(|m| m.is_file())
         {
             return Ok(path.clone());
         }
 
-        // Tell Zed we are checking for an update (shown in the status bar).
+        // Tell Zed UI we are checking for an update.
         zed::set_language_server_installation_status(
             language_server_id,
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
 
-        // Fetch the latest release from GitHub.
+        // Fetch the latest release from GitHub. Skip pre-releaases and tag-only releases with no attached binaries.
         let release = zed::latest_github_release(
-            "0xdea/zed-highlight",
+            REPOSITORY,
             zed::GithubReleaseOptions {
-                require_assets: true, // Skip tag-only releases with no attached binaries
-                pre_release: false,   // Skip pre-releases
+                require_assets: true,
+                pre_release: false,
             },
         )?;
 
         // Determine which prebuilt asset to download for the current platform.
         let (os, arch) = zed::current_platform();
         let asset_name = format!(
-            "zed-highlight-lsp-{os}-{arch}.tar.gz",
+            "{BINARY_NAME}-{os}-{arch}.tar.gz",
             os = match os {
                 zed::Os::Mac => "darwin",
                 zed::Os::Linux => "linux",
@@ -108,13 +109,13 @@ impl ZedHighlightExtension {
 
         // The versioned directory name encodes the release tag so that:
         // - A cached binary from the current version is reused without re-downloading.
-        // - Upgrading to a new release stores the new binary in a different directory and cleans up the old one.
-        let version_dir = format!("zed-highlight-lsp-{}", release.version);
-        let binary_path = format!("{version_dir}/zed-highlight-lsp");
+        // - Upgrading to a new release stores the new binary in a different directory and cleans up the old ones.
+        let version_dir = format!("{BINARY_NAME}-{}", release.version);
+        let binary_path = format!("{version_dir}/{BINARY_NAME}");
 
         // Download and extract the binary if it's not already present.
         if !fs::metadata(&binary_path).is_ok_and(|m| m.is_file()) {
-            // Tell Zed we are downloading the update.
+            // Tell Zed UI we are downloading the update.
             zed::set_language_server_installation_status(
                 language_server_id,
                 &zed::LanguageServerInstallationStatus::Downloading,
@@ -127,25 +128,22 @@ impl ZedHighlightExtension {
                 .ok_or_else(|| {
                     format!(
                         "no prebuilt binary found for {asset_name}. \
-                         Build zed-highlight-lsp manually and place it on your PATH."
+                         Build {BINARY_NAME} manually and place it on your PATH."
                     )
                 })?;
 
-            // Extract the archive into `version_dir` (a path relative to the extension's Zed-managed
-            // working directory). After extraction, the binary lives at `version_dir/zed-highlight-lsp`.
+            // Extract the archive into `version_dir` (relative to the extension's Zed-managed working directory).
             zed::download_file(
                 &asset.download_url,
                 &version_dir,
                 zed::DownloadedFileType::GzipTar,
             )
-            .map_err(|e| format!("failed to download zed-highlight-lsp: {e}"))?;
+            .map_err(|e| format!("failed to download {BINARY_NAME}: {e}"))?;
 
-            // Ensure the binary is executable (tar.gz preserves permissions but calling this is a no-op if the bit is
-            // already set or on Windows, so it's safe to always call).
+            // Ensure the binary is executable (this is a no-op on Windows or if the bit is already set).
             zed::make_file_executable(&binary_path)?;
 
-            // Remove all other versioned directories to avoid unbounded disk growth as releases accumulate.
-            // Errors here an non-fatal.
+            // Remove all other directories to avoid unbounded disk growth. Errors here an non-fatal.
             if let Ok(entries) = fs::read_dir(".") {
                 for entry in entries.flatten() {
                     if entry.file_name().to_str() != Some(&version_dir) {
@@ -155,7 +153,7 @@ impl ZedHighlightExtension {
             }
         }
 
-        // Reset Zed's language server installation status indicator.
+        // Reset Zed UI language server installation status indicator.
         zed::set_language_server_installation_status(
             language_server_id,
             &zed::LanguageServerInstallationStatus::None,
@@ -167,9 +165,14 @@ impl ZedHighlightExtension {
     }
 }
 
-// Register as a Zed extension
-zed::register_extension!(ZedHighlightExtension);
+/// Register as a Zed extension.
+mod register {
+    // The `register_extension!` macro expands to `pub` glue items that the WASM host imports by name.
+    // Wrapping the call in a module prevents the `missing_docs` lint from firing.
+    super::zed::register_extension!(super::ZedHighlightExtension);
+}
 
+// TODO: add tests
 /*
 #[cfg(test)]
 mod tests {
