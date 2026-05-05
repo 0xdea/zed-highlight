@@ -1,12 +1,13 @@
 id = "zed-highlight"
-name = "Zed-Highlight"
+name = "Zed Highlight"
 description = "Highlight all occurrences of selected words with multiple cycling colors."
 version = "0.1.0"
 schema_version = 1
 authors = ["Marco Ivaldi <raptor@0xdeadbeef.info>"]
+repository = "https://github.com/0xdea/zed-highlight"
 
-[language_servers.zed-highlight]
-name = "Zed-Highlight"
+[language_servers.zed-highlight-lsp]
+name = "Zed Highlight LSP"
 languages = [
     "Bash",
     "C",

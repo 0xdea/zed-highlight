@@ -15,12 +15,12 @@ keywords = ["zed", "zed-extension", "vuln-dev", "code-review", "source-code"]
 categories = ["security", "development-tools", "text-editors"]
 exclude = [".cargo/*", ".github/*", ".img/*", ".gitignore", ".taplo.toml", "tests/*"]
 
+[dependencies]
+zed_extension_api = "0.7"
+
 [lib]
 crate-type = ["cdylib"]
 path = "src/lib.rs"
-
-[dependencies]
-zed_extension_api = "0.7"
 
 [profile.release]
 strip = true
