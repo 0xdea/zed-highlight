@@ -9,7 +9,7 @@ repository = "https://github.com/0xdea/zed-highlight"
 license = "MIT"
 keywords = ["zed", "zed-extension", "lsp-server", "vuln-dev", "code-review"]
 categories = ["security", "development-tools", "text-editors"]
-exclude = [".cargo/*", ".github/*", ".img/*", ".gitignore", ".taplo.toml", "tests/*"]
+exclude = ["tests/*"]
 
 [dependencies]
 tower-lsp = "0.20"
