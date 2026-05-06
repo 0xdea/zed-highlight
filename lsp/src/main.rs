@@ -1,4 +1,4 @@
-#![doc = include_str!("../../README.md")]
+#![doc = include_str!("../README.md")]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/logo.png"
 )]
