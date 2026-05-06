@@ -13,7 +13,7 @@ repository = "https://github.com/0xdea/zed-highlight"
 license = "MIT"
 keywords = ["zed", "zed-extension", "vuln-dev", "code-review", "source-code"]
 categories = ["security", "development-tools", "text-editors"]
-exclude = [".cargo/*", ".github/*", ".img/*", ".gitignore", ".taplo.toml", "tests/*"]
+exclude = [".cargo/*", ".github/*", ".img/*", ".gitignore", ".taplo.toml", "tests/*", "extension.wasm"]
 
 [dependencies]
 zed_extension_api = "0.7"
@@ -78,7 +78,7 @@ multiple_unsafe_ops_per_block = "warn"
 # allow some lints
 # doc_markdown = "allow"
 # missing_errors_doc = "allow"
-# multiple_crate_versions = "allow"
+multiple_crate_versions = "allow"
 # significant_drop_tightening = "allow"
 # wildcard_imports = "allow"
 # must_use_candidate = "allow"
