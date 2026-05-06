@@ -94,6 +94,6 @@ Tested with Zed 1.0.1 on:
 TODO
 
 - Extensively test with both light and dark themes.
-- Add customizable settings (whole words, ignore case, etc.).
+- Add customizable settings (e.g., `whole_word`, `ignore_case`).
 - Add highlighting based on regular expressions.
 - Add sidebar for navigation between highlighted words.
