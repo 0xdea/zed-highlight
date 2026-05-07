@@ -143,11 +143,15 @@ impl ZedHighlightExtension {
             // Ensure the binary is executable (this is a no-op on Windows or if the bit is already set).
             zed::make_file_executable(&binary_path)?;
 
-            // Remove all other directories to avoid unbounded disk growth. Errors here an non-fatal.
+            // Remove all other directories to avoid unbounded disk growth.
+            #[expect(
+                clippy::let_underscore_must_use,
+                reason = "Errors here are non-fatal and can be safely ignored."
+            )]
             if let Ok(entries) = fs::read_dir(".") {
                 for entry in entries.flatten() {
                     if entry.file_name().to_str() != Some(&version_dir) {
-                        fs::remove_dir_all(entry.path()).ok();
+                        let _ = fs::remove_dir_all(entry.path());
                     }
                 }
             }

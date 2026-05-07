@@ -167,17 +167,25 @@ impl Backend {
 
     /// Cancel any pending debounced refresh and send a workspace/semanticTokens/refresh notification to Zed right now.
     /// Used after user-triggered actions (toggle/clear) where we want the highlight change to appear without delay.
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Errors from the refresh notification are intentionally ignored."
+    )]
     async fn immediate_refresh(&self) {
         let refresh_handle = self.refresh_handle.lock().await.take();
         if let Some(h) = refresh_handle {
             h.abort();
         }
-        self.client.semantic_tokens_refresh().await.ok();
+        let _ = self.client.semantic_tokens_refresh().await;
     }
 
     /// Schedule a workspace/semanticTokens/refresh after a short idle delay, cancelling any previously scheduled one.
     /// This is a classic debounce: rapid events (keystrokes) keep resetting the timer; the refresh only fires
     /// once the user pauses.
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "Errors from the refresh notification are intentionally ignored."
+    )]
     async fn debounced_refresh(&self) {
         let mut guard = self.refresh_handle.lock().await;
         // Abort the previous timer task if one is already running.
@@ -187,7 +195,7 @@ impl Backend {
         let client = self.client.clone();
         *guard = Some(tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-            client.semantic_tokens_refresh().await.ok();
+            let _ = client.semantic_tokens_refresh().await;
         }));
     }
 
