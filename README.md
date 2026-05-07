@@ -1,9 +1,9 @@
 # zed-highlight
 
 [![](https://img.shields.io/github/stars/0xdea/zed-highlight.svg?style=flat&color=yellow)](https://github.com/0xdea/zed-highlight)
-[![](https://img.shields.io/crates/v/zed-highlight?style=flat&color=green)](https://crates.io/crates/zed-highlight)
-[![](https://img.shields.io/crates/d/zed-highlight?style=flat&color=red)](https://crates.io/crates/zed-highlight)
-[![](https://img.shields.io/badge/zed-1.0.1-violet)](https://zed.dev/)
+[![](https://img.shields.io/crates/v/zed-highlight-lsp?style=flat&color=green)](https://crates.io/crates/zed-highlight-lsp)
+[![](https://img.shields.io/crates/d/zed-highlight-lsp?style=flat&color=red)](https://crates.io/crates/zed-highlight-lsp)
+[![](https://img.shields.io/badge/zed-1.1.6-violet)](https://zed.dev/)
 [![](https://img.shields.io/badge/twitter-%400xdea-blue.svg)](https://twitter.com/0xdea)
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
 [![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
@@ -24,10 +24,6 @@ TODO
 - Remove all highlights with a single command.
 - Configurable highlight colors.
 
-## Blog post
-
-- TODO
-
 ## See also
 
 - <https://zed.dev/extensions>
@@ -37,35 +33,13 @@ TODO
 
 ## Installing
 
-TODO
+TODO - add instructions for installing via Zed's extension marketplace once it's published there.
 
-The easiest way to get the latest release is via [crates.io](https://crates.io/crates/zed-highlight):
-
-```sh
-cargo install zed-highlight
-```
-
-To install as a library, run the following command in your project directory:
-
-```sh
-cargo add zed-highlight
-```
-
-## Compiling
-
-TODO
-
-Alternatively, you can build from [source](https://github.com/0xdea/zed-highlight):
-
-```sh
-git clone https://github.com/0xdea/zed-highlight
-cd zed-highlight
-cargo build --release
-```
+TODO - add instructions for installing the LSP server manually via `cargo install zed-highlight-lsp` + dev extension
 
 ## Usage
 
-TODO
+TODO - add detailed instructions for using the extension, including keyboard shortcuts and configuration options.
 
 Run zed-highlight as follows:
 
@@ -75,7 +49,7 @@ TODO
 
 ## Compatibility
 
-Tested with Zed 1.0.1 on:
+The latest release was tested with Zed 1.1.6 on:
 
 - Apple macOS Tahoe 26.4.1
 - Ubuntu Linux 24.04.4 LTS - TODO

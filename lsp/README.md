@@ -1,5 +1,13 @@
 # zed-highlight-lsp
 
+[![](https://img.shields.io/github/stars/0xdea/zed-highlight.svg?style=flat&color=yellow)](https://github.com/0xdea/zed-highlight)
+[![](https://img.shields.io/crates/v/zed-highlight-lsp?style=flat&color=green)](https://crates.io/crates/zed-highlight-lsp)
+[![](https://img.shields.io/crates/d/zed-highlight-lsp?style=flat&color=red)](https://crates.io/crates/zed-highlight-lsp)
+[![](https://img.shields.io/badge/zed-1.1.6-violet)](https://zed.dev/)
+[![](https://img.shields.io/badge/twitter-%400xdea-blue.svg)](https://twitter.com/0xdea)
+[![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
+[![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
+
 > "Free as in use-after."
 >
 > -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
@@ -8,69 +16,37 @@ Zed Highlight LSP is a Language Server implemented for the [Zed](https://zed.dev
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
-## Features
-
-TODO
-
-- Toggle highlighting on and off for a selected word.
-- Remove all highlights with a single command.
-- Configurable highlight colors.
-
-## Blog post
-
-- TODO
-
 ## See also
 
 - <https://github.com/0xdea/zed-highlight>
-- <https://zed.dev/extensions>
-- <https://marketplace.visualstudio.com/items?itemName=debugpig.highlight>
-- <https://github.com/debugpig/vscode-extension-highlight>
-- <https://github.com/rsbondi/highlight-words>
 
 ## Installing
 
-TODO
+For regular use, Zed Highlight LSP is installed automatically by the [Zed Highlight](https://github.com/0xdea/zed-highlight) extension.
 
-`cargo install --path lsp`
-
-The easiest way to get the latest release is via [crates.io](https://crates.io/crates/zed-highlight):
+If you want to install it manually, you can do so via [crates.io](https://crates.io/crates/zed-highlight-lsp):
 
 ```sh
-cargo install zed-highlight
-```
-
-To install as a library, run the following command in your project directory:
-
-```sh
-cargo add zed-highlight
+cargo install zed-highlight-lsp
 ```
 
 ## Compiling
-
-TODO
 
 Alternatively, you can build from [source](https://github.com/0xdea/zed-highlight):
 
 ```sh
 git clone https://github.com/0xdea/zed-highlight
 cd zed-highlight
-cargo build --release
+cargo install --path lsp
 ```
 
 ## Usage
 
-TODO
-
-Run zed-highlight as follows:
-
-```sh
-TODO
-```
+The LSP server is automatically launched by the Zed Highlight extension when you open a file in Zed. Refer to the [main README](https://github.com/0xdea/zed-highlight/blob/master/README.md) for usage instructions.
 
 ## Compatibility
 
-Tested with Zed 1.0.1 on:
+The latest release was tested with Zed 1.1.6 on:
 
 - Apple macOS Tahoe 26.4.1
 - Ubuntu Linux 24.04.4 LTS - TODO
@@ -83,12 +59,3 @@ Tested with Zed 1.0.1 on:
 ## Changelog
 
 - [CHANGELOG.md](https://github.com/0xdea/zed-highlight/blob/master/CHANGELOG.md)
-
-## TODO
-
-TODO
-
-- Extensively test with both light and dark themes.
-- Add customizable settings (e.g., `whole_word`, `ignore_case`).
-- Add highlighting based on regular expressions.
-- Add sidebar for navigation between highlighted words.
