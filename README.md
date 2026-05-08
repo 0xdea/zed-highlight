@@ -65,9 +65,7 @@ The latest release was tested with Zed 1.1.6 on:
 
 ## TODO
 
-TODO
-
-- Extensively test with both light and dark themes.
-- Add customizable settings (e.g., `whole_word`, `ignore_case`).
+- Test extensively, with both light and dark themes.
+- Add customizable settings (e.g., `whole_word` and `ignore_case` that are already suppported by the LSP).
 - Add highlighting based on regular expressions.
-- Add sidebar for navigation between highlighted words.
+- Add sidebar for navigation between currently highlighted words.

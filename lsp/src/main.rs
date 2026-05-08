@@ -8,7 +8,9 @@
 )]
 
 use std::collections::HashMap;
+use std::option::Option;
 use std::sync::Arc;
+use std::time::Duration;
 
 use regex::Regex;
 use tokio::sync::Mutex;
@@ -23,8 +25,8 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// How many distinct highlight colors to cycle through.
 const NUM_COLORS: usize = 8;
 
-/// These names are arbitrary strings that the LSP server advertises as its semantic token type legend. Zed looks them
-/// up in `global_lsp_settings.semantic_token_rules` (settings.json) to map each name to a foreground/background color.
+/// These names are arbitrary strings that the LSP advertises as its semantic token type legend. Zed looks them up in
+/// `global_lsp_settings.semantic_token_rules` (settings.json file) to map each name to a foreground/background color.
 ///
 /// ## Examples
 ///
@@ -66,51 +68,43 @@ struct State {
     /// Full text of every open document, keyed by URI.
     docs: HashMap<Url, String>,
 
-    /// Whether to only match whole words (e.g., "for" doesn't match inside "format"). Default: true.
+    /// Whether to only match whole words (e.g., "for" doesn't match inside "format").
     whole_word: bool,
 
-    /// Whether to ignore case when matching (e.g., "Foo" matches "foo"). Default: true.
+    /// Whether to ignore case when matching (e.g., "Foo" matches "foo").
     ignore_case: bool,
 }
 
 impl State {
-    /// Construct and return a new instance of the server's internal state.
+    /// Construct a new instance of the server's internal state.
+    ///
+    /// By default, `whole_word` matching is set to true, while `ignore_case` defaults to false. This should be
+    /// sensible default behavior for most users, and we can consider making them configurable later if there's demand.
     fn new() -> Self {
         Self {
             words: Vec::new(),
             docs: HashMap::new(),
             whole_word: true,
-            ignore_case: true,
+            ignore_case: false,
         }
     }
 
     /// Toggle a word in/out of the highlight list.
     ///
     /// Three cases:
-    /// 1. Word already exists: soft-delete it preserving the slot (set its slot to `None`).
-    /// 2. Word is new and there are `None` slots: reuse the first free slot so we reclaim the color index.
+    /// 1. Word is already in the list: soft-delete it preserving the slot (set its slot to `None`).
+    /// 2. Word is new and there's a `None` slot: reuse the first free slot so we reclaim the color index.
     /// 3. Word is new and there are no free slots: grow the list appending a new `Some(word)`.
     fn toggle(&mut self, word: &str) {
-        let ignore_case = self.ignore_case;
-
-        // Build a comparison closure once so we don't repeat the branch inside the iterator.
-        let eq = move |a: &str, b: &str| -> bool {
-            if ignore_case {
-                a.to_lowercase() == b.to_lowercase()
-            } else {
-                a == b
-            }
-        };
-
         if let Some(idx) = self
             .words
             .iter()
-            .position(|opt| opt.as_deref().is_some_and(|w| eq(w, word)))
+            .position(|opt| opt.as_deref().is_some_and(|w| self.words_eq(w, word)))
         {
-            // Case 1: Word already exists: soft-delete it preserving the slot (set its slot to `None`).
+            // Case 1: Word is already in the list: soft-delete it preserving the slot (set its slot to `None`).
             self.words[idx] = None;
         } else if let Some(slot) = self.words.iter_mut().find(|o| o.is_none()) {
-            // Case 2: Word is new and there are `None` slots: reuse the first free slot so we reclaim the color index.
+            // Case 2: Word is new and there's a `None` slot: reuse the first free slot so we reclaim the color index.
             *slot = Some(word.to_owned());
         } else {
             // Case 3: Word is new and there are no free slots: grow the list appending a new `Some(word)`.
@@ -120,21 +114,23 @@ impl State {
 
     /// Check whether a word is currently highlighted, respecting `ignore_case`.
     fn is_highlighted(&self, word: &str) -> bool {
-        let ignore_case = self.ignore_case;
-        self.words.iter().any(|opt| {
-            opt.as_deref().is_some_and(|w| {
-                if ignore_case {
-                    w.to_lowercase() == word.to_lowercase()
-                } else {
-                    w == word
-                }
-            })
-        })
+        self.words
+            .iter()
+            .any(|opt| opt.as_deref().is_some_and(|w| self.words_eq(w, word)))
     }
 
-    /// True if at least one word is currently highlighted. Used to skip refresh when the highlight list is empty.
+    /// Check whether at least one word is currently highlighted.
     fn has_any(&self) -> bool {
-        self.words.iter().any(std::option::Option::is_some)
+        self.words.iter().any(Option::is_some)
+    }
+
+    /// Helper function to compare two words for equality, respecting `ignore_case`.
+    fn words_eq(&self, a: &str, b: &str) -> bool {
+        if self.ignore_case {
+            a.to_lowercase() == b.to_lowercase()
+        } else {
+            a == b
+        }
     }
 }
 
@@ -194,7 +190,7 @@ impl Backend {
         }
         let client = self.client.clone();
         *guard = Some(tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            tokio::time::sleep(Duration::from_millis(250)).await;
             let _ = client.semantic_tokens_refresh().await;
         }));
     }

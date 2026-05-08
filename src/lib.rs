@@ -21,7 +21,7 @@ struct ZedHighlightExtension {
 }
 
 impl zed::Extension for ZedHighlightExtension {
-    /// Construct and return a new instance of the extension.
+    /// Construct a new instance of the extension.
     fn new() -> Self {
         Self {
             cached_binary_path: None,
