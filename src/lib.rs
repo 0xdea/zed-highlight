@@ -67,7 +67,7 @@ impl ZedHighlightExtension {
     /// Returns an error if:
     /// - The latest release cannot be fetched from GitHub.
     /// - No suitable prebuilt binary asset is found for the current platform.
-    /// - The binary fails to download or extract.
+    /// - The binary fails to download, extract, or be made executable.
     fn ensure_binary(&mut self, language_server_id: &LanguageServerId) -> Result<String> {
         // Immediately return the cached path if the file still exists on disk.
         if let Some(ref path) = self.cached_binary_path
