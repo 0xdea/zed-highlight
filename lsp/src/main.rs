@@ -139,9 +139,9 @@ impl State {
 /// The LSP server's backend implementation.
 ///
 /// This struct holds the shared state and implements the [`LanguageServer`] trait that tower-lsp dispatches to. Each
-/// method corresponds to a particular LSP request or notification that Zed sends us. The main logic is in
-/// [`Backend::build_tokens`], which scans the document for matches and encodes the token positions in the format
-/// required by the LSP semantic tokens protocol.
+/// method corresponds to a particular LSP request that Zed sends us. The main logic is in [`Backend::build_tokens`],
+/// which scans the document for matches and encodes the token positions in the format required by the LSP semantic
+/// tokens protocol.
 struct Backend {
     /// The tower-lsp client handle used to send requests (e.g., `workspace/semanticTokens/refresh`) to Zed.
     client: Client,
@@ -154,7 +154,7 @@ struct Backend {
 }
 
 impl Backend {
-    /// Construct and return a new instance of the server's baxckend.
+    /// Construct a new instance of the server's backend.
     fn new(client: Client) -> Self {
         Self {
             client,
@@ -163,34 +163,39 @@ impl Backend {
         }
     }
 
-    /// Cancel any pending debounced refresh and send a `workspace/semanticTokens/refresh` notification to Zed right
-    /// now. Used after user-triggered actions (toggle/clear) where we want the highlight change to appear without
-    /// delay.
+    /// Cancel any pending debounced refresh and send a `workspace/semanticTokens/refresh` request to Zed right now.
+    /// Used after user-driven actions (toggle/clear) where we want the highlight change to appear without delay.
     #[expect(
         clippy::let_underscore_must_use,
-        reason = "Errors from the refresh notification are intentionally ignored."
+        reason = "Errors from the refresh request are intentionally ignored."
     )]
     async fn immediate_refresh(&self) {
+        // Cancel any pending debounced refresh.
         let refresh_handle = self.refresh_handle.lock().await.take();
         if let Some(h) = refresh_handle {
             h.abort();
         }
+
+        // Send the refresh request to Zed, ignoring any errors.
         let _ = self.client.semantic_tokens_refresh().await;
     }
 
-    /// Schedule a `workspace/semanticTokens/refresh` after a short idle delay, cancelling any previously scheduled one.
-    /// This is a classic debounce: rapid events (keystrokes) keep resetting the timer; the refresh only fires
-    /// once the user pauses.
+    /// Schedule a `workspace/semanticTokens/refresh` request after a short idle delay, cancelling any previously
+    /// scheduled one. Classic debounce pattern: rapid events (keystrokes) keep resetting the timer; the refresh only
+    /// fires once the user pauses.
     #[expect(
         clippy::let_underscore_must_use,
-        reason = "Errors from the refresh notification are intentionally ignored."
+        reason = "Errors from the refresh request are intentionally ignored."
     )]
     async fn debounced_refresh(&self) {
         let mut guard = self.refresh_handle.lock().await;
-        // Abort the previous timer task if one is already running.
+
+        // Cancel any pending debounced refresh.
         if let Some(h) = guard.take() {
             h.abort();
         }
+
+        // Schedule a new debounced refresh request.
         let client = self.client.clone();
         *guard = Some(tokio::spawn(async move {
             tokio::time::sleep(Duration::from_millis(DEBOUNCE_DELAY_MS)).await;
@@ -198,9 +203,9 @@ impl Backend {
         }));
     }
 
-    /// Build the full list of `SemanticTokens` for a document.
+    /// Build the full list of [`SemanticTokens`] for a document.
     ///
-    /// The LSP semantic-tokens protocol requires tokens to be encoded as a flat array of 5-tuples in document order,
+    /// The LSP semantic tokens protocol requires tokens to be encoded as a flat array of 5-tuples in document order,
     /// where each position is expressed as a delta from the previous token (not an absolute position). This lets
     /// the client decode the stream in one pass without random access.
     ///
@@ -391,9 +396,9 @@ fn word_at(content: &str, range: Range) -> Option<String> {
 
 /// LSP server implementation.
 ///
-/// We implement the `LanguageServer` trait from tower-lsp, which requires us to define an async method for each LSP
-/// request/notification we want to handle. The `Backend` struct holds our shared state and client handle, and we
-/// dispatch to helper methods for the main logic.
+/// We implement the [`LanguageServer`] trait from tower-lsp, which requires us to define an async method for each LSP
+/// request we want to handle. The [`Backend`] struct holds our shared state and client handle, and we dispatch to
+/// helper methods for the main logic.
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     /// Called once at server startup. We respond with our capabilities so Zed knows which features we support and how
@@ -454,7 +459,7 @@ impl LanguageServer for Backend {
     /// Called when Zed opens a file for the first time (not on every tab switch to an already-open file).
     ///
     /// To prevent race conditions, after storing the document we schedule a debounced refresh, which asks Zed to
-    /// re-request tokens DEBOUNCE_DELAY_MS later, by which time state.docs is guaranteed to be up to date.
+    /// re-request tokens [`DEBOUNCE_DELAY_MS`] later, by which time state.docs is guaranteed to be up to date.
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let has_any = {
             let mut state = self.state.lock().await;
@@ -471,7 +476,7 @@ impl LanguageServer for Backend {
     /// Called on every edit. With FULL sync the `content_changes` vec always contains exactly one entry holding the
     /// complete new document text.
     ///
-    /// Again, `debounced_refresh` is the safety net that corrects any stale token response once typing pauses.
+    /// [`Backend::debounced_refresh`] is the safety net that corrects any stale token response once typing pauses.
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let has_any = {
             let mut state = self.state.lock().await;
@@ -498,7 +503,7 @@ impl LanguageServer for Backend {
     /// Zed calls this whenever it wants the current highlight tokens for a file. It is called:
     /// - When the file first opens.
     /// - After each `did_change` (Zed's own auto-request),
-    /// - In response to our `workspace/semanticTokens/refresh` notification.
+    /// - In response to our `workspace/semanticTokens/refresh` request.
     ///
     /// We return `result_id: None`, meaning we do not support delta tokens.
     async fn semantic_tokens_full(
@@ -570,7 +575,7 @@ impl LanguageServer for Backend {
 
     /// Called when the user selects a code action. We mutate state here, then call `immediate_refresh` to tell Zed to
     /// re-request semantic tokens right away. `immediate_refresh` also cancels any pending debounced refresh to avoid
-    /// a redundant second re-request DEBOUNCE_DELAY_MS later.
+    /// a redundant second re-request [`DEBOUNCE_DELAY_MS`] later.
     async fn execute_command(
         &self,
         params: ExecuteCommandParams,
@@ -600,8 +605,8 @@ impl LanguageServer for Backend {
 
 /// Entry point of the LSP server.
 ///
-/// LSP servers communicate over stdin/stdout. tower-lsp handles the JSON-RPC framing and dispatches each message to
-/// the appropriate handler on the Backend. The server runs until stdin is closed (i.e. until the editor exits or
+/// LSP servers communicate over stdin/stdout; tower-lsp handles the JSON-RPC framing and dispatches each message to
+/// the appropriate handler on the [`Backend`]. The server runs until stdin is closed (i.e., until the editor exits or
 /// restarts the language server).
 #[tokio::main]
 async fn main() {
