@@ -24,6 +24,8 @@ const PROGRAM: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// How many distinct highlight colors to cycle through.
 const NUM_COLORS: usize = 8;
+/// Delay in milliseconds for the debounced refresh after edits.
+const DEBOUNCE_DELAY_MS: u64 = 250;
 
 /// These names are arbitrary strings that the LSP advertises as its semantic token type legend. Zed looks them up in
 /// `global_lsp_settings.semantic_token_rules` (settings.json file) to map each name to a foreground/background color.
@@ -78,8 +80,8 @@ struct State {
 impl State {
     /// Construct a new instance of the server's internal state.
     ///
-    /// By default, `whole_word` matching is set to true, while `ignore_case` defaults to false. This should be
-    /// sensible default behavior for most users, and we can consider making them configurable later if there's demand.
+    /// By default, `whole_word` matching is set to true, while the `ignore_case` flag defaults to false. This should be
+    /// a sensible default behavior, and we can consider making these flags configurable later if there's demand.
     fn new() -> Self {
         Self {
             words: Vec::new(),
@@ -112,19 +114,19 @@ impl State {
         }
     }
 
-    /// Check whether a word is currently highlighted, respecting `ignore_case`.
+    /// Check whether at least one word is currently highlighted.
+    fn has_any(&self) -> bool {
+        self.words.iter().any(Option::is_some)
+    }
+
+    /// Check whether a word is currently highlighted.
     fn is_highlighted(&self, word: &str) -> bool {
         self.words
             .iter()
             .any(|opt| opt.as_deref().is_some_and(|w| self.words_eq(w, word)))
     }
 
-    /// Check whether at least one word is currently highlighted.
-    fn has_any(&self) -> bool {
-        self.words.iter().any(Option::is_some)
-    }
-
-    /// Helper function to compare two words for equality, respecting `ignore_case`.
+    /// Helper function to compare two words for equality, respecting the `ignore_case` flag.
     fn words_eq(&self, a: &str, b: &str) -> bool {
         if self.ignore_case {
             a.to_lowercase() == b.to_lowercase()
@@ -136,18 +138,18 @@ impl State {
 
 /// The LSP server's backend implementation.
 ///
-/// This struct holds the shared state and implements the `LanguageServer` trait that tower-lsp dispatches to. Each
+/// This struct holds the shared state and implements the [`LanguageServer`] trait that tower-lsp dispatches to. Each
 /// method corresponds to a particular LSP request or notification that Zed sends us. The main logic is in
-/// `build_tokens`, which scans the document for matches and encodes the token positions in the format required by the
-/// LSP semantic tokens protocol.
+/// [`Backend::build_tokens`], which scans the document for matches and encodes the token positions in the format
+/// required by the LSP semantic tokens protocol.
 struct Backend {
-    /// The tower-lsp client handle used to send server->client notifications.
+    /// The tower-lsp client handle used to send requests (e.g., `workspace/semanticTokens/refresh`) to Zed.
     client: Client,
 
     /// Shared mutable state behind a tokio async `Mutex`.
     state: Arc<Mutex<State>>,
 
-    /// Handle to the currently pending debounced-refresh task, if any.
+    /// Handle to the currently pending debounced refresh task, if any.
     refresh_handle: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
@@ -161,8 +163,9 @@ impl Backend {
         }
     }
 
-    /// Cancel any pending debounced refresh and send a workspace/semanticTokens/refresh notification to Zed right now.
-    /// Used after user-triggered actions (toggle/clear) where we want the highlight change to appear without delay.
+    /// Cancel any pending debounced refresh and send a `workspace/semanticTokens/refresh` notification to Zed right
+    /// now. Used after user-triggered actions (toggle/clear) where we want the highlight change to appear without
+    /// delay.
     #[expect(
         clippy::let_underscore_must_use,
         reason = "Errors from the refresh notification are intentionally ignored."
@@ -175,7 +178,7 @@ impl Backend {
         let _ = self.client.semantic_tokens_refresh().await;
     }
 
-    /// Schedule a workspace/semanticTokens/refresh after a short idle delay, cancelling any previously scheduled one.
+    /// Schedule a `workspace/semanticTokens/refresh` after a short idle delay, cancelling any previously scheduled one.
     /// This is a classic debounce: rapid events (keystrokes) keep resetting the timer; the refresh only fires
     /// once the user pauses.
     #[expect(
@@ -190,7 +193,7 @@ impl Backend {
         }
         let client = self.client.clone();
         *guard = Some(tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(250)).await;
+            tokio::time::sleep(Duration::from_millis(DEBOUNCE_DELAY_MS)).await;
             let _ = client.semantic_tokens_refresh().await;
         }));
     }
@@ -451,7 +454,7 @@ impl LanguageServer for Backend {
     /// Called when Zed opens a file for the first time (not on every tab switch to an already-open file).
     ///
     /// To prevent race conditions, after storing the document we schedule a debounced refresh, which asks Zed to
-    /// re-request tokens 250 ms later, by which time state.docs is guaranteed to be up to date.
+    /// re-request tokens DEBOUNCE_DELAY_MS later, by which time state.docs is guaranteed to be up to date.
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let has_any = {
             let mut state = self.state.lock().await;
@@ -567,7 +570,7 @@ impl LanguageServer for Backend {
 
     /// Called when the user selects a code action. We mutate state here, then call `immediate_refresh` to tell Zed to
     /// re-request semantic tokens right away. `immediate_refresh` also cancels any pending debounced refresh to avoid
-    /// a redundant second re-request 250 ms later.
+    /// a redundant second re-request DEBOUNCE_DELAY_MS later.
     async fn execute_command(
         &self,
         params: ExecuteCommandParams,
