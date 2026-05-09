@@ -18,9 +18,9 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
-/// Package name
+/// Package name.
 const PROGRAM: &str = env!("CARGO_PKG_NAME");
-/// Package version
+/// Package version.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// How many distinct highlight colors to cycle through.
 const NUM_COLORS: usize = 8;
