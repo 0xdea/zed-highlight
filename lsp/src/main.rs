@@ -101,7 +101,7 @@ impl State {
         if let Some(idx) = self
             .words
             .iter()
-            .position(|opt| opt.as_deref().is_some_and(|w| self.words_eq(w, word)))
+            .position(|o| o.as_deref().is_some_and(|w| self.words_eq(w, word)))
         {
             // Case 1: Word is already in the list: soft-delete it preserving the slot (set its slot to `None`).
             self.words[idx] = None;
@@ -123,7 +123,7 @@ impl State {
     fn is_highlighted(&self, word: &str) -> bool {
         self.words
             .iter()
-            .any(|opt| opt.as_deref().is_some_and(|w| self.words_eq(w, word)))
+            .any(|o| o.as_deref().is_some_and(|w| self.words_eq(w, word)))
     }
 
     /// Helper function to compare two words for equality, respecting the `ignore_case` flag.
