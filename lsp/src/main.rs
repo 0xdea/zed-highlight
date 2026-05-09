@@ -139,9 +139,9 @@ impl State {
 /// The LSP server's backend implementation.
 ///
 /// This struct holds the shared state and implements the [`LanguageServer`] trait that tower-lsp dispatches to. Each
-/// method corresponds to a particular LSP request that Zed sends us. The main logic is in [`Backend::build_tokens`],
-/// which scans the document for matches and encodes the token positions in the format required by the LSP semantic
-/// tokens protocol.
+/// method corresponds to a particular LSP request/notification that Zed sends us. The main logic is in
+/// [`Backend::build_tokens`], which scans the document for matches and encodes the token positions in the format
+/// required by the LSP semantic tokens protocol.
 struct Backend {
     /// The tower-lsp client handle used to send requests (e.g., `workspace/semanticTokens/refresh`) to Zed.
     client: Client,
@@ -333,7 +333,7 @@ fn utf16_to_byte(s: &str, utf16_offset: usize) -> Option<usize> {
     }
 }
 
-/// Helper function to return the word the user is acting on, given the cursor range from a codeAction request.
+/// Helper function to return the word the user is acting on, given the cursor range from a `codeAction` request.
 ///
 /// Two cases:
 /// 1. Non-empty single-line selection: use the selected text directly. This lets the user highlight multi-word phrases
@@ -395,8 +395,8 @@ fn word_at(content: &str, range: Range) -> Option<String> {
 /// LSP server implementation.
 ///
 /// We implement the [`LanguageServer`] trait from tower-lsp, which requires us to define an async method for each LSP
-/// request we want to handle. The [`Backend`] struct holds our shared state and client handle, and we dispatch to
-/// helper methods for the main logic.
+/// request/notification we want to handle. The [`Backend`] struct holds our shared state and client handle, and we
+/// dispatch to helper methods for the main logic.
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     /// Called once at server startup. We respond with our capabilities so Zed knows which features we support and how
@@ -448,8 +448,10 @@ impl LanguageServer for Backend {
         })
     }
 
+    /// Called after `initialize`, once the client is ready to receive requests. Can be empty for this simple server.
     async fn initialized(&self, _: InitializedParams) {}
 
+    /// Called when the server is shutting down. We have no resources to clean up in this simple server.
     async fn shutdown(&self) -> Result<()> {
         Ok(())
     }
