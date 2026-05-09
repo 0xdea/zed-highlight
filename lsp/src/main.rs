@@ -36,26 +36,26 @@ const DEBOUNCE_DELAY_MS: u64 = 250;
 /// ```json
 /// "global_lsp_settings": {
 ///   "semantic_token_rules": [
-///     { "token_type": "highlight-0", "foreground_color": "#F5B041", "background_color": "#F5B04150" },
-///     { "token_type": "highlight-1", "foreground_color": "#85C1E9", "background_color": "#85C1E950" },
-///     { "token_type": "highlight-2", "foreground_color": "#CD6155", "background_color": "#CD615550" },
-///     { "token_type": "highlight-3", "foreground_color": "#AF7AC5", "background_color": "#AF7AC550" },
-///     { "token_type": "highlight-4", "foreground_color": "#48C9B0", "background_color": "#48C9B050" },
-///     { "token_type": "highlight-5", "foreground_color": "#F4D03F", "background_color": "#F4D03F50" },
-///     { "token_type": "highlight-6", "foreground_color": "#52BE80", "background_color": "#52BE8050" },
-///     { "token_type": "highlight-7", "foreground_color": "#FF9933", "background_color": "#FF993350" },
+///     { "token_type": "zed-highlight-0", "foreground_color": "#F5B041", "background_color": "#F5B04150" },
+///     { "token_type": "zed-highlight-1", "foreground_color": "#85C1E9", "background_color": "#85C1E950" },
+///     { "token_type": "zed-highlight-2", "foreground_color": "#CD6155", "background_color": "#CD615550" },
+///     { "token_type": "zed-highlight-3", "foreground_color": "#AF7AC5", "background_color": "#AF7AC550" },
+///     { "token_type": "zed-highlight-4", "foreground_color": "#48C9B0", "background_color": "#48C9B050" },
+///     { "token_type": "zed-highlight-5", "foreground_color": "#F4D03F", "background_color": "#F4D03F50" },
+///     { "token_type": "zed-highlight-6", "foreground_color": "#52BE80", "background_color": "#52BE8050" },
+///     { "token_type": "zed-highlight-7", "foreground_color": "#FF9933", "background_color": "#FF993350" },
 ///   ],
 /// },
 /// ```
 static TOKEN_TYPE_NAMES: [&str; NUM_COLORS] = [
-    "highlight-0",
-    "highlight-1",
-    "highlight-2",
-    "highlight-3",
-    "highlight-4",
-    "highlight-5",
-    "highlight-6",
-    "highlight-7",
+    "zed-highlight-0",
+    "zed-highlight-1",
+    "zed-highlight-2",
+    "zed-highlight-3",
+    "zed-highlight-4",
+    "zed-highlight-5",
+    "zed-highlight-6",
+    "zed-highlight-7",
 ];
 
 /// The LSP server's internal state.
