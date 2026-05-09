@@ -58,7 +58,7 @@ static TOKEN_TYPE_NAMES: [&str; NUM_COLORS] = [
     "zed-highlight-7",
 ];
 
-/// The LSP server's internal state.
+/// LSP server's internal state.
 ///
 /// We track the list of highlighted words and the full text of every open document so we can scan for token positions
 /// on demand. We also track the user's settings for whole-word and case-insensitive matching. All state is kept in
@@ -136,7 +136,7 @@ impl State {
     }
 }
 
-/// The LSP server's backend implementation.
+/// LSP server's backend.
 ///
 /// This struct holds the shared state and implements the [`LanguageServer`] trait that tower-lsp dispatches to. Each
 /// method corresponds to a particular LSP request/notification that Zed sends us. The main logic is in
@@ -154,7 +154,7 @@ struct Backend {
 }
 
 impl Backend {
-    /// Construct a new instance of the server's backend.
+    /// Construct a new instance of the server's backend given a [`Client`].
     fn new(client: Client) -> Self {
         Self {
             client,
@@ -281,8 +281,8 @@ impl Backend {
         //             = this_start                (when delta_line > 0)
         // i.e., the start offset resets to absolute whenever the line changes.
         let mut tokens = Vec::with_capacity(raw.len());
-        let mut prev_line = 0_u32;
-        let mut prev_start = 0_u32;
+        let mut prev_line = 0;
+        let mut prev_start = 0;
 
         for (line, start, length, token_type) in raw {
             let delta_line = line - prev_line;
@@ -306,93 +306,7 @@ impl Backend {
     }
 }
 
-/// Helper function to count the number of UTF-16 code units in a UTF-8 string slice.
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "UTF-16 code unit count should fit in u32 for any reasonable line length."
-)]
-fn utf16_len(s: &str) -> u32 {
-    s.chars().map(|c| c.len_utf16() as u32).sum()
-}
-
-/// Helper function to convert a UTF-16 character offset to a byte offset within `s`.
-fn utf16_to_byte(s: &str, utf16_offset: usize) -> Option<usize> {
-    let mut count = 0_usize;
-    for (i, c) in s.char_indices() {
-        if count == utf16_offset {
-            return Some(i);
-        }
-        count += c.len_utf16();
-    }
-    // Handle the case where the offset points exactly at the end of the string.
-    if count == utf16_offset {
-        Some(s.len())
-    // Offset is past the end (shouldn't happen with valid LSP data).
-    } else {
-        None
-    }
-}
-
-/// Helper function to return the word the user is acting on, given the cursor range from a `codeAction` request.
-///
-/// Two cases:
-/// 1. Non-empty single-line selection: use the selected text directly. This lets the user highlight multi-word phrases
-///    or identifiers that include characters our word-boundary logic would split on.
-/// 2. Cursor (empty range, or multi-line — we ignore multi-line): find the word under the cursor by scanning backwards
-///    and forwards for word chars.
-///
-/// "Word characters" are alphanumerics plus underscore, matching \w in most regex flavors and covering the common case
-///  of identifiers in source code.
-fn word_at(content: &str, range: Range) -> Option<String> {
-    let line = content.lines().nth(range.start.line as usize)?;
-
-    // Case 1: Non-empty single-line selection.
-    if range.start.line == range.end.line && range.start.character != range.end.character {
-        let s = utf16_to_byte(line, range.start.character as usize)?;
-        let e = utf16_to_byte(line, range.end.character as usize)?;
-        if s < e {
-            let text = line[s..e].trim().to_owned();
-            if !text.is_empty() {
-                return Some(text);
-            }
-        }
-    }
-
-    // Case 2: Find the word under the cursor.
-    let byte_pos = utf16_to_byte(line, range.start.character as usize)?;
-    let is_word = |c: char| c.is_alphanumeric() || c == '_';
-
-    // If the cursor is sitting on a non-word character, there's nothing to highlight (e.g., cursor is on a space or
-    // punctuation).
-    if !line[byte_pos..].chars().next().is_some_and(is_word) {
-        return None;
-    }
-
-    // Scan left from cursor_pos to find the start of the word.
-    let start = line[..byte_pos]
-        .char_indices()
-        .rev()
-        .take_while(|(_, c)| is_word(*c))
-        .last()
-        .map_or(byte_pos, |(i, _)| i);
-
-    // Scan right from cursor_pos to find the end of the word.
-    // We add the character's byte length so `end` is a past-the-end byte index.
-    let end = byte_pos
-        + line[byte_pos..]
-            .char_indices()
-            .take_while(|(_, c)| is_word(*c))
-            .last()
-            .map_or(0, |(i, c)| i + c.len_utf8());
-
-    if start < end {
-        Some(line[start..end].to_string())
-    } else {
-        None
-    }
-}
-
-/// LSP server implementation.
+/// LSP server's implementation.
 ///
 /// We implement the [`LanguageServer`] trait from tower-lsp, which requires us to define an async method for each LSP
 /// request/notification we want to handle. The [`Backend`] struct holds our shared state and client handle, and we
@@ -600,6 +514,92 @@ impl LanguageServer for Backend {
             _ => {}
         }
         Ok(None)
+    }
+}
+
+/// Helper function to count the number of UTF-16 code units in a UTF-8 string slice.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "UTF-16 code unit count should fit in u32 for any reasonable line length."
+)]
+fn utf16_len(s: &str) -> u32 {
+    s.chars().map(|c| c.len_utf16() as u32).sum()
+}
+
+/// Helper function to convert a UTF-16 character offset to a byte offset within `s`.
+fn utf16_to_byte(s: &str, utf16_offset: usize) -> Option<usize> {
+    let mut count = 0;
+    for (i, c) in s.char_indices() {
+        // Check the offset before counting the current character.
+        if count == utf16_offset {
+            return Some(i);
+        }
+        count += c.len_utf16();
+    }
+    // Handle the case where the offset points exactly at the end of the string.
+    if count == utf16_offset {
+        Some(s.len())
+    // Offset is past the end (shouldn't happen with valid LSP data).
+    } else {
+        None
+    }
+}
+
+/// Helper function to return the word the user is acting on, given the cursor range from a `codeAction` request.
+///
+/// Two cases:
+/// 1. Non-empty single-line selection: use the selected text directly. This lets the user highlight multi-word phrases
+///    or identifiers that include characters our word-boundary logic would split on.
+/// 2. Cursor (empty range, or multi-line — we ignore multi-line): find the word under the cursor by scanning backwards
+///    and forwards for word chars.
+///
+/// "Word characters" are alphanumerics plus underscore, matching \w in most regex flavors and covering the common case
+///  of identifiers in source code.
+fn word_at(content: &str, range: Range) -> Option<String> {
+    // Get the line where the cursor is. If the line is missing (shouldn't happen with valid LSP data), return None.
+    let line = content.lines().nth(range.start.line as usize)?;
+
+    // Case 1: Use the non-empty single-line selection directly (multi-line selections fall through to case 2).
+    if range.start.line == range.end.line && range.start.character != range.end.character {
+        let s = utf16_to_byte(line, range.start.character as usize)?;
+        let e = utf16_to_byte(line, range.end.character as usize)?;
+        if s < e {
+            let text = line[s..e].trim().to_owned();
+            if !text.is_empty() {
+                return Some(text);
+            }
+        }
+    }
+
+    // Case 2: Find the word under the cursor.
+    let byte_pos = utf16_to_byte(line, range.start.character as usize)?;
+    let is_word = |c: char| c.is_alphanumeric() || c == '_';
+
+    // If the cursor is on a non-word character, there's nothing to highlight (cursor is on a space or punctuation).
+    if !line[byte_pos..].chars().next().is_some_and(is_word) {
+        return None;
+    }
+
+    // Scan left from `cursor_pos` to find the start of the word.
+    let start = line[..byte_pos]
+        .char_indices()
+        .rev()
+        .take_while(|(_, c)| is_word(*c))
+        .last()
+        .map_or(byte_pos, |(i, _)| i);
+
+    // Scan right from `cursor_pos` to find the end of the word.
+    let end = byte_pos
+        + line[byte_pos..]
+            .char_indices()
+            .take_while(|(_, c)| is_word(*c))
+            .last()
+            .map_or(0, |(i, c)| i + c.len_utf8());
+
+    if start < end {
+        Some(line[start..end].to_string())
+    } else {
+        None
     }
 }
 
