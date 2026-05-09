@@ -205,9 +205,9 @@ impl Backend {
 
     /// Build the full list of [`SemanticTokens`] for a document.
     ///
-    /// The LSP semantic tokens protocol requires tokens to be encoded as a flat array of 5-tuples in document order,
-    /// where each position is expressed as a delta from the previous token (not an absolute position). This lets
-    /// the client decode the stream in one pass without random access.
+    /// The LSP semantic tokens protocol requires tokens to be encoded as a flat array of [`SemanticToken`] 5-tuples in
+    /// document order, where each position is expressed as a delta from the previous token (not an absolute position).
+    /// This lets the client decode the stream in one pass without random access.
     ///
     /// Character offsets must be in UTF-16 code units because that is what the LSP spec mandates.
     #[expect(
@@ -215,6 +215,7 @@ impl Backend {
         reason = "UTF-16 code unit count should fit in u32 for any reasonable line length."
     )]
     async fn build_tokens(&self, uri: &Url) -> Vec<SemanticToken> {
+        // Snapshot the state and release the lock.
         let (content, words, whole_word, ignore_case) = {
             let state = self.state.lock().await;
             let Some(content) = state.docs.get(uri).cloned() else {
@@ -229,20 +230,17 @@ impl Backend {
             )
         };
 
-        // Collect all matches as absolute (line, char_start, char_len, type_idx) tuples first, then sort, then convert
-        // to delta encoding. Doing it in two passes is easier than trying to maintain sorted order while iterating
-        // over multiple words.
+        // Collect all matches as absolute (`line`, `start`, `length`, `token_type`) tuples.
         let mut raw: Vec<(u32, u32, u32, u32)> = Vec::new();
 
         for (color_idx, opt) in words.iter().enumerate() {
             let word = match opt {
                 Some(w) if !w.is_empty() => w,
-                // Skip None (soft-deleted) and empty-string slots.
+                // Skip `None` (soft-deleted) and empty-string slots.
                 _ => continue,
             };
 
-            // Build the regex for this word. We escape the word first so that punctuation in the word is treated
-            // literally, not as regex syntax.
+            // Build the regex for this word, escaping it first so that punctuation is treated literally.
             let escaped = regex::escape(word);
             let mut pattern = if whole_word {
                 // The word-boundary assertion prevents "for" from matching inside "format".
@@ -259,24 +257,24 @@ impl Backend {
                 continue;
             };
 
-            // Color index wraps around if more than NUM_COLORS words are highlighted simultaneously.
-            let type_idx = (color_idx % NUM_COLORS) as u32;
+            // Color index wraps around if more than `NUM_COLORS` words are highlighted simultaneously.
+            let token_type = (color_idx % NUM_COLORS) as u32;
 
             for (line_idx, line) in content.lines().enumerate() {
                 for m in re.find_iter(line) {
                     // The LSP protocol requires UTF-16 character offsets, so we convert.
-                    let char_start = utf16_len(&line[..m.start()]);
-                    let char_len = utf16_len(m.as_str());
-                    raw.push((line_idx as u32, char_start, char_len, type_idx));
+                    let start = utf16_len(&line[..m.start()]);
+                    let length = utf16_len(m.as_str());
+                    raw.push((line_idx as u32, start, length, token_type));
                 }
             }
         }
 
-        // Sort by (line, start) so we can compute deltas in a single forward pass. Multiple words can produce matches
-        // on the same line, so we must sort across all of them together.
+        // Sort by (`line`, `start`).
         raw.sort_unstable_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
 
         // Convert absolute positions to the LSP delta encoding.
+        //
         // Rules from the spec:
         // delta_line  = this_line - prev_line
         // delta_start = this_start - prev_start   (only when delta_line == 0)
@@ -298,7 +296,7 @@ impl Backend {
                 delta_start,
                 length,
                 token_type,
-                token_modifiers_bitset: 0, // We declare no modifiers.
+                token_modifiers_bitset: 0, // No modifiers.
             });
             prev_line = line;
             prev_start = start;
