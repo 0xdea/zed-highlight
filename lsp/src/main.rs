@@ -464,8 +464,9 @@ impl LanguageServer for Backend {
         };
         let has_any = state.has_any();
 
-        // Find the word the user is acting on, if any, and determine whether it's already highlighted.
-        let word = word_at(&content, params.range);
+        // Find the highlitable word the user is acting on, if any, and determine whether it's already highlighted.
+        let word =
+            word_at(&content, params.range).filter(|w| is_highlightable(w, state.whole_word));
         let already_highlighted = word.as_deref().is_some_and(|w| state.is_highlighted(w));
 
         // Explicitly release the lock before building the response.
@@ -529,8 +530,19 @@ impl LanguageServer for Backend {
                     .next()
                     .and_then(|v| v.as_str().map(str::to_owned));
                 if let Some(w) = word {
-                    self.state.lock().await.toggle(&w);
-                    self.immediate_refresh().await;
+                    // Toggle the word in the highlight list only if it's highlightable.
+                    let toggled = {
+                        let mut state = self.state.lock().await;
+                        if is_highlightable(&w, state.whole_word) {
+                            state.toggle(&w);
+                            true
+                        } else {
+                            false
+                        }
+                    };
+                    if toggled {
+                        self.immediate_refresh().await;
+                    }
                 }
             }
 
@@ -577,6 +589,30 @@ fn utf16_to_byte(s: &str, utf16_offset: usize) -> Option<usize> {
     }
 }
 
+/// Helper function to check if a character is a "word character" for the purposes of determining word boundaries.
+fn is_word_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
+/// Helper function to check whether a given text can produce visible highlights based on the current matching rules.
+///
+/// In `whole_word` mode the pattern `\b<escaped>\b` only matches when the first and last characters of the candidate
+/// are word characters. Candidates failing this rule would compile into a regex that never matches, so we use this
+/// predicate to filter them out at the code-action layer rather than letting them sit in `words` invisibly.
+fn is_highlightable(text: &str, whole_word: bool) -> bool {
+    if text.is_empty() {
+        return false;
+    }
+    if !whole_word {
+        return true;
+    }
+
+    let starts_ok = text.chars().next().is_some_and(is_word_char);
+    let ends_ok = text.chars().next_back().is_some_and(is_word_char);
+
+    starts_ok && ends_ok
+}
+
 /// Helper function to return the word the user is acting on, given the cursor range from a `codeAction` request.
 ///
 /// Two cases:
@@ -605,10 +641,9 @@ fn word_at(content: &str, range: Range) -> Option<String> {
 
     // Case 2: Find the word under the cursor.
     let byte_pos = utf16_to_byte(line, range.start.character as usize)?;
-    let is_word = |c: char| c.is_alphanumeric() || c == '_';
 
     // If the cursor is on a non-word character, there's nothing to highlight (cursor is on a space or punctuation).
-    if !line[byte_pos..].chars().next().is_some_and(is_word) {
+    if !line[byte_pos..].chars().next().is_some_and(is_word_char) {
         return None;
     }
 
@@ -616,7 +651,7 @@ fn word_at(content: &str, range: Range) -> Option<String> {
     let start = line[..byte_pos]
         .char_indices()
         .rev()
-        .take_while(|(_, c)| is_word(*c))
+        .take_while(|(_, c)| is_word_char(*c))
         .last()
         .map_or(byte_pos, |(i, _)| i);
 
@@ -624,7 +659,7 @@ fn word_at(content: &str, range: Range) -> Option<String> {
     let end = byte_pos
         + line[byte_pos..]
             .char_indices()
-            .take_while(|(_, c)| is_word(*c))
+            .take_while(|(_, c)| is_word_char(*c))
             .last()
             .map_or(0, |(i, c)| i + c.len_utf8());
 
