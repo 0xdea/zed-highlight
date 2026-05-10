@@ -29,7 +29,7 @@ TODO
 - <https://zed.dev/extensions>
 - <https://marketplace.visualstudio.com/items?itemName=debugpig.highlight>
 - <https://github.com/debugpig/vscode-extension-highlight>
-- <https://github.com/rsbondi/highlight-words>
+- <https://github.com/huacnlee/color-lsp>
 
 ## Installing
 
