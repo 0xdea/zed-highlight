@@ -65,7 +65,9 @@ The latest release was tested with Zed 1.1.6 on:
 
 ## TODO
 
-- Test extensively, with both light and dark themes.
+- Test with both light and dark themes. Then, release v0.1.0 to the Zed marketplace and [crates.io](https://crates.io/).
+- Try another approach to implementing colors via LSP (e.g., `textDocument/documentColor` capability).
+- Add command-line interface for manual use of the LSP server outside of Zed.
 - Add customizable settings (e.g., `whole_word` and `ignore_case` flags that are already suppported by the LSP).
 - Add highlighting based on regular expressions.
 - Add sidebar for navigation between currently highlighted words.
