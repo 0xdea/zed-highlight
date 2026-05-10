@@ -603,6 +603,38 @@ fn is_highlightable(text: &str, whole_word: bool) -> bool {
     starts_ok && ends_ok
 }
 
+/// Helper function to check whether a given text produces at least one visible highlight in the current document under
+/// the current matching rules. We do not match in all open documents.
+///
+/// This is the strongest predicate we can use to decide if a code-action menu entry is worth showing: it asks the
+/// exact question whose answer determines whether the user would see anything change after toggling.
+fn matches_anywhere(content: &str, text: &str, whole_word: bool, ignore_case: bool) -> bool {
+    let Some(re) = compile_word_regex(text, whole_word, ignore_case) else {
+        return false;
+    };
+    content.lines().any(|line| re.is_match(line))
+}
+
+/// Helper function to compile a regex for a given word, escaping it first so that punctuation is treated literally and
+/// respecting the `whole_word` and `ignore_case` flags.
+///
+/// Returns `None` if the pattern fails to compile (extremely unlikely for an escaped literal).
+fn compile_word_regex(word: &str, whole_word: bool, ignore_case: bool) -> Option<Regex> {
+    // Treat the word as a literal string by escaping it.
+    let escaped = regex::escape(word);
+    let mut pattern = if whole_word {
+        // The word-boundary assertion prevents "for" from matching inside "format".
+        format!(r"\b{escaped}\b")
+    } else {
+        escaped
+    };
+    if ignore_case {
+        // Make the entire pattern case-insensitive.
+        pattern = format!("(?i){pattern}");
+    }
+    Regex::new(&pattern).ok()
+}
+
 /// Helper function to return the word the user is acting on, given the cursor range from a `codeAction` request.
 ///
 /// Two cases:
@@ -611,8 +643,8 @@ fn is_highlightable(text: &str, whole_word: bool) -> bool {
 /// 2. Cursor (empty range, or multi-line — we ignore multi-line): find the word under the cursor by scanning backwards
 ///    and forwards for word chars.
 ///
-/// "Word characters" are alphanumerics plus underscore, matching \w in most regex flavors and covering the common case
-///  of identifiers in source code.
+/// "Word characters" are alphanumerics plus underscore, matching `\w` in most regex flavors and covering the common
+/// case of identifiers in source code.
 fn word_at(content: &str, range: Range) -> Option<String> {
     // Get the line where the cursor is. If the line is missing (shouldn't happen with valid LSP data), return None.
     let line = content.lines().nth(range.start.line as usize)?;
@@ -658,38 +690,6 @@ fn word_at(content: &str, range: Range) -> Option<String> {
     } else {
         None
     }
-}
-
-/// Helper function to check whether a given text produces at least one visible highlight in the current document under
-/// the current matching rules. We do not match in all open documents.
-///
-/// This is the strongest predicate we can use to decide if a code-action menu entry is worth showing: it asks the
-/// exact question whose answer determines whether the user would see anything change after toggling.
-fn matches_anywhere(content: &str, text: &str, whole_word: bool, ignore_case: bool) -> bool {
-    let Some(re) = compile_word_regex(text, whole_word, ignore_case) else {
-        return false;
-    };
-    content.lines().any(|line| re.is_match(line))
-}
-
-/// Helper function to compile a regex for a given word, escaping it first so that punctuation is treated literally and
-/// respecting the `whole_word` and `ignore_case` flags.
-///
-/// Returns `None` if the pattern fails to compile (extremely unlikely for an escaped literal).
-fn compile_word_regex(word: &str, whole_word: bool, ignore_case: bool) -> Option<Regex> {
-    // Treat the word as a literal string by escaping it.
-    let escaped = regex::escape(word);
-    let mut pattern = if whole_word {
-        // The word-boundary assertion prevents "for" from matching inside "format".
-        format!(r"\b{escaped}\b")
-    } else {
-        escaped
-    };
-    if ignore_case {
-        // Make the entire pattern case-insensitive.
-        pattern = format!("(?i){pattern}");
-    }
-    Regex::new(&pattern).ok()
 }
 
 /// Entry point of the LSP server.
