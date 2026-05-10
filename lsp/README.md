@@ -52,8 +52,6 @@ The LSP server is automatically launched by the Zed Highlight extension when you
 The latest release was tested with Zed 1.1.6 on:
 
 - Apple macOS Tahoe 26.4.1
-- Ubuntu Linux 24.04.4 LTS - TODO
-- Microsoft Windows 11 23H2 - TODO
 
 ## Credits
 

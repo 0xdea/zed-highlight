@@ -80,8 +80,8 @@ struct State {
 impl State {
     /// Construct a new instance of the server's internal state.
     ///
-    /// By default, `whole_word` matching is set to true, while the `ignore_case` flag defaults to false. This should be
-    /// a sensible default behavior, and we can consider making these flags configurable later if there's demand.
+    /// By default, [`State::whole_word`] matching is set to true, while the [`State::ignore_case`] flag defaults to
+    /// false. This should be a sensible default behavior, and we can consider making these flags configurable later.
     fn new() -> Self {
         Self {
             words: Vec::new(),
@@ -131,7 +131,7 @@ impl State {
         self.words.clear();
     }
 
-    /// Helper function to compare two words for equality, respecting the `ignore_case` flag.
+    /// Helper function to compare two words for equality, respecting the [`State::ignore_case`] flag.
     fn words_eq(&self, a: &str, b: &str) -> bool {
         if self.ignore_case {
             a.to_lowercase() == b.to_lowercase()
@@ -337,8 +337,8 @@ impl LanguageServer for Backend {
                 ),
 
                 // Code actions appear in the "editor: toggle code actions" menu (accessed with the `⌘.` shortcut or the
-                // lightning bolt icon in the gutter). We use them to surface "Highlight: <word>", "Remove highlight:
-                // <word>", and "Clear all highlights" actions without requiring the user to bind a custom keymap entry.
+                // lightning bolt icon in the gutter). We use them to surface `Highlight: <word>`, `Remove highlight:
+                // <word>`, and `Clear all highlights` actions without requiring the user to bind a custom keymap entry.
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
 
                 // Register each supported command name so Zed knows to route `executeCommand` calls to this server.
@@ -442,8 +442,8 @@ impl LanguageServer for Backend {
     /// Called whenever Zed opens the "editor: toggle code actions" menu.
     ///
     /// We return up to two actions:
-    /// - "Highlight: <word>" or "Remove highlight: <word>" (if cursor is on a word or selection).
-    /// - "Clear all highlights" (only if there are any active highlights).
+    /// - `Highlight: <word>` or `Remove highlight: <word>` (if cursor is on a word or selection).
+    /// - `Clear all highlights` (only if there are any active highlights).
     async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
         // Snapshot the state.
         let state = self.state.lock().await;
@@ -672,7 +672,7 @@ fn matches_anywhere(content: &str, text: &str, whole_word: bool, ignore_case: bo
 }
 
 /// Helper function to compile a regex for a given word, escaping it first so that punctuation is treated literally, and
-/// respecting the `whole_word` and `ignore_case` flags.
+/// respecting the [`State::whole_word`] and [`State::ignore_case`] flags.
 ///
 /// Returns `None` if the pattern fails to compile (unlikely for an escaped literal).
 fn compile_word_regex(word: &str, whole_word: bool, ignore_case: bool) -> Option<Regex> {

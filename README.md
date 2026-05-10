@@ -33,28 +33,20 @@ Zed Highlight is a Language Server Protocol (LSP) extension for the [Zed](https:
 ## Installing
 
 TODO - add instructions for installing via Zed's extension marketplace once it's published there.
-
 TODO - add instructions for installing the LSP server manually via `cargo install zed-highlight-lsp` + dev extension
 
 ## Usage
 
+Use zed-highlight as follows:
+
 TODO - add detailed instructions for using the extension, including custom keymap entries and configuration options.
-
 TODO - add instructions for configuring colors (e.g., via `settings.json`).
-
-Run zed-highlight as follows:
-
-```sh
-TODO
-```
 
 ## Compatibility
 
 The latest release was tested with Zed 1.1.6 on:
 
 - Apple macOS Tahoe 26.4.1
-- Ubuntu Linux 24.04.4 LTS - TODO
-- Microsoft Windows 11 23H2 - TODO
 
 ## Credits
 
@@ -66,9 +58,9 @@ The latest release was tested with Zed 1.1.6 on:
 
 ## TODO
 
-- Test with both light and dark themes. Then, release v0.1.0 to the Zed marketplace and [crates.io](https://crates.io/).
-- Try another approach to implementing colors via LSP (e.g., `textDocument/documentColor` capability).
-- Add command-line interface for manual use of the LSP server outside of Zed.
+- Test with both light and dark themes. Then, release to the Zed marketplace and [crates.io](https://crates.io/).
+- Try another approach to implementing colors via LSP (e.g., the `textDocument/documentColor` capability).
+- Add a command-line interface for manual use of the LSP server outside of Zed.
 - Add customizable settings (e.g., `whole_word` and `ignore_case` flags that are already suppported by the LSP).
 - Add highlighting based on regular expressions.
-- Add sidebar for navigation between currently highlighted words.
+- Add a sidebar for navigation between currently highlighted words.
