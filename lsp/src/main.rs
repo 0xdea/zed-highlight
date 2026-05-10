@@ -421,7 +421,7 @@ impl LanguageServer for Backend {
             .remove(&params.text_document.uri);
     }
 
-    /// Called whenever Zed wants the current highlight tokens for a document. It is called:
+    /// Called whenever Zed wants the current highlight tokens for a document, which happens:
     /// - When the document first opens.
     /// - After each [`Backend::did_change`] (Zed's own auto-request).
     /// - In response to our `workspace/semanticTokens/refresh` request.
@@ -579,69 +579,11 @@ fn utf16_to_byte(s: &str, utf16_offset: usize) -> Option<usize> {
     }
 }
 
-/// Helper function to check if a character is a "word character" for the purposes of determining word boundaries.
-fn is_word_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
-}
-
-/// Helper function to check whether a given text can produce visible highlights based on the current matching rules.
-///
-/// In `whole_word` mode the pattern `\b<escaped>\b` only matches when the first and last characters of the candidate
-/// are word characters. Candidates failing this rule would compile into a regex that never matches, so we use this
-/// predicate to filter them out at the code-action layer rather than letting them sit in `words` invisibly.
-fn is_highlightable(text: &str, whole_word: bool) -> bool {
-    if text.is_empty() {
-        return false;
-    }
-    if !whole_word {
-        return true;
-    }
-
-    let starts_ok = text.chars().next().is_some_and(is_word_char);
-    let ends_ok = text.chars().next_back().is_some_and(is_word_char);
-
-    starts_ok && ends_ok
-}
-
-/// Helper function to check whether a given text produces at least one visible highlight in the current document under
-/// the current matching rules. We do not match in all open documents.
-///
-/// This is the strongest predicate we can use to decide if a code-action menu entry is worth showing: it asks the
-/// exact question whose answer determines whether the user would see anything change after toggling.
-fn matches_anywhere(content: &str, text: &str, whole_word: bool, ignore_case: bool) -> bool {
-    let Some(re) = compile_word_regex(text, whole_word, ignore_case) else {
-        return false;
-    };
-    content.lines().any(|line| re.is_match(line))
-}
-
-/// Helper function to compile a regex for a given word, escaping it first so that punctuation is treated literally and
-/// respecting the `whole_word` and `ignore_case` flags.
-///
-/// Returns `None` if the pattern fails to compile (extremely unlikely for an escaped literal).
-fn compile_word_regex(word: &str, whole_word: bool, ignore_case: bool) -> Option<Regex> {
-    // Treat the word as a literal string by escaping it.
-    let escaped = regex::escape(word);
-    let mut pattern = if whole_word {
-        // The word-boundary assertion prevents "for" from matching inside "format".
-        format!(r"\b{escaped}\b")
-    } else {
-        escaped
-    };
-    if ignore_case {
-        // Make the entire pattern case-insensitive.
-        pattern = format!("(?i){pattern}");
-    }
-    Regex::new(&pattern).ok()
-}
-
-/// Helper function to return the word the user is acting on, given the cursor range from a `codeAction` request.
+/// Helper function to return the word the user is acting on, given the cursor range from a code action request.
 ///
 /// Two cases:
-/// 1. Non-empty single-line selection: use the selected text directly. This lets the user highlight multi-word phrases
-///    or identifiers that include characters our word-boundary logic would split on.
-/// 2. Cursor (empty range, or multi-line — we ignore multi-line): find the word under the cursor by scanning backwards
-///    and forwards for word chars.
+/// 1. Non-empty single-line selection: use the selected text directly.
+/// 2. Cursor (empty range, or multi-line): find the word under the cursor by scanning backwards and forwards.
 ///
 /// "Word characters" are alphanumerics plus underscore, matching `\w` in most regex flavors and covering the common
 /// case of identifiers in source code.
@@ -669,7 +611,7 @@ fn word_at(content: &str, range: Range) -> Option<String> {
         return None;
     }
 
-    // Scan left from `cursor_pos` to find the start of the word.
+    // Scan left from the cursor position to find the start of the word.
     let start = line[..byte_pos]
         .char_indices()
         .rev()
@@ -677,7 +619,7 @@ fn word_at(content: &str, range: Range) -> Option<String> {
         .last()
         .map_or(byte_pos, |(i, _)| i);
 
-    // Scan right from `cursor_pos` to find the end of the word.
+    // Scan right from the cursor position to find the end of the word.
     let end = byte_pos
         + line[byte_pos..]
             .char_indices()
@@ -692,10 +634,67 @@ fn word_at(content: &str, range: Range) -> Option<String> {
     }
 }
 
+/// Helper function to check if a character is a "word character" for the purposes of determining word boundaries.
+fn is_word_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
+/// Helper function to check whether a given text can produce visible highlights based on the current matching rules.
+///
+/// In `whole_word` mode the pattern `\b<escaped>\b` only matches when the first and last characters of the candidate
+/// are word characters. Candidates failing this rule would compile into a regex that never matches, so we use this
+/// predicate to filter them out early at the code action layer rather than letting them sit in `words` invisibly.
+fn is_highlightable(text: &str, whole_word: bool) -> bool {
+    if text.is_empty() {
+        return false;
+    }
+    if !whole_word {
+        return true;
+    }
+
+    let starts_ok = text.chars().next().is_some_and(is_word_char);
+    let ends_ok = text.chars().next_back().is_some_and(is_word_char);
+
+    starts_ok && ends_ok
+}
+
+/// Helper function to check whether a given text produces at least one visible highlight in the current document under
+/// the current matching rules. We do not match in all open documents.
+///
+/// This is the strongest predicate we can use to decide if a code action menu entry is worth showing: it asks the
+/// exact question whose answer determines whether the user would see anything change after toggling, at a somewhat
+/// negligible performance cost.
+fn matches_anywhere(content: &str, text: &str, whole_word: bool, ignore_case: bool) -> bool {
+    let Some(re) = compile_word_regex(text, whole_word, ignore_case) else {
+        return false;
+    };
+    content.lines().any(|line| re.is_match(line))
+}
+
+/// Helper function to compile a regex for a given word, escaping it first so that punctuation is treated literally, and
+/// respecting the `whole_word` and `ignore_case` flags.
+///
+/// Returns `None` if the pattern fails to compile (unlikely for an escaped literal).
+fn compile_word_regex(word: &str, whole_word: bool, ignore_case: bool) -> Option<Regex> {
+    // Treat the word as a literal string by escaping it.
+    let escaped = regex::escape(word);
+    let mut pattern = if whole_word {
+        // The word-boundary assertion prevents "for" from matching inside "format".
+        format!(r"\b{escaped}\b")
+    } else {
+        escaped
+    };
+    if ignore_case {
+        // Make the entire pattern case-insensitive.
+        pattern = format!("(?i){pattern}");
+    }
+    Regex::new(&pattern).ok()
+}
+
 /// Entry point of the LSP server.
 ///
-/// LSP servers communicate over stdin/stdout; tower-lsp handles the JSON-RPC framing and dispatches each message to
-/// the appropriate handler on the [`Backend`]. The server runs until stdin is closed (i.e., until the editor exits or
+/// LSP servers communicate over `stdin`/`stdout`; tower-lsp handles the JSON-RPC framing and dispatches each message to
+/// the appropriate handler on the [`Backend`]. The server runs until `stdin` is closed (i.e., until the editor exits or
 /// restarts the language server).
 #[tokio::main]
 async fn main() {
