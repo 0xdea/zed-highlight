@@ -126,6 +126,11 @@ impl State {
             .any(|o| o.as_deref().is_some_and(|w| self.words_eq(w, word)))
     }
 
+    /// Clear all highlighted words.
+    fn words_clear(&mut self) {
+        self.words.clear();
+    }
+
     /// Helper function to compare two words for equality, respecting the `ignore_case` flag.
     fn words_eq(&self, a: &str, b: &str) -> bool {
         if self.ignore_case {
@@ -375,11 +380,12 @@ impl LanguageServer for Backend {
         Ok(())
     }
 
-    /// Called when Zed opens a file for the first time (not on every tab switch to an already-open file).
+    /// Called when Zed opens a document for the first time (not on every tab switch to an already-open file).
     ///
     /// To prevent race conditions, after storing the document we schedule a debounced refresh, which asks Zed to
-    /// re-request tokens [`DEBOUNCE_DELAY_MS`] later, by which time state.docs is guaranteed to be up to date.
+    /// re-request tokens [`DEBOUNCE_DELAY_MS`] later, by which time `state.docs` is guaranteed to be up to date.
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
+        // Store the document text in `state.docs`.
         let has_any = {
             let mut state = self.state.lock().await;
             state
@@ -387,30 +393,37 @@ impl LanguageServer for Backend {
                 .insert(params.text_document.uri, params.text_document.text);
             state.has_any()
         };
+
+        // Schedule a debounced refresh to update the tokens if there are highlighted words.
         if has_any {
             self.debounced_refresh().await;
         }
     }
 
-    /// Called on every edit. With FULL sync the `content_changes` vec always contains exactly one entry holding the
-    /// complete new document text.
+    /// Called on every document edit.
     ///
     /// [`Backend::debounced_refresh`] is the safety net that corrects any stale token response once typing pauses.
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
+        // Update the document text in `state.docs`.
         let has_any = {
             let mut state = self.state.lock().await;
+            // With FULL sync, there should always be exactly one content change with the full new text, but we
+            // defensively handle the case where it's missing just in case.
             if let Some(change) = params.content_changes.into_iter().last() {
                 state.docs.insert(params.text_document.uri, change.text);
             }
             state.has_any()
         };
+
+        // Schedule a debounced refresh to update the tokens if there are highlighted words.
         if has_any {
             self.debounced_refresh().await;
         }
     }
 
-    /// Called when a tab is closed. We evict the document to reclaim memory; if the file is reopened, `did_open` will
-    /// re-populate `state.docs`.
+    /// Called when a document is closed.
+    ///
+    /// We evict the document to reclaim memory; if the file is reopened, `did_open` will re-populate `state.docs`.
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         self.state
             .lock()
@@ -419,16 +432,17 @@ impl LanguageServer for Backend {
             .remove(&params.text_document.uri);
     }
 
-    /// Zed calls this whenever it wants the current highlight tokens for a file. It is called:
-    /// - When the file first opens.
-    /// - After each `did_change` (Zed's own auto-request),
+    /// Called whenever Zed wants the current highlight tokens for a document. It is called:
+    /// - When the document first opens.
+    /// - After each [`Backend::did_change`] (Zed's own auto-request).
     /// - In response to our `workspace/semanticTokens/refresh` request.
     ///
-    /// We return `result_id: None`, meaning we do not support delta tokens.
+    /// Returns `result_id: None`, meaning delta tokens are not supported.
     async fn semantic_tokens_full(
         &self,
         params: SemanticTokensParams,
     ) -> Result<Option<SemanticTokensResult>> {
+        // Build the token list for the requested document.
         let data = self.build_tokens(&params.text_document.uri).await;
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
@@ -436,25 +450,31 @@ impl LanguageServer for Backend {
         })))
     }
 
-    /// Called whenever Zed opens the code-action menu (⌘. / lightbulb).
+    /// Called whenever Zed opens the "editor: toggle code actions" menu.
+    ///
     /// We return up to two actions:
-    /// - "Highlight: word" or "Remove highlight: word" (if cursor is on a word)
-    /// - "Clear all highlights" (only if there are any active highlights)
+    /// - "Highlight: word" or "Remove highlight: word" (if cursor is on a word or selection).
+    /// - "Clear all highlights" (only if there are any active highlights).
     async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
+        // Snapshot the state.
         let state = self.state.lock().await;
         let content = match state.docs.get(&params.text_document.uri) {
             Some(c) => c.clone(),
             None => return Ok(None),
         };
         let has_any = state.has_any();
+
+        // Find the word the user is acting on, if any, and determine whether it's already highlighted.
         let word = word_at(&content, params.range);
         let already_highlighted = word.as_deref().is_some_and(|w| state.is_highlighted(w));
 
-        // Release the lock before building the response.
+        // Explicitly release the lock before building the response.
         drop(state);
 
+        // Build the list of code actions to return.
         let mut actions: Vec<CodeActionOrCommand> = Vec::new();
 
+        // Highlight toggle action for the current word, if any.
         if let Some(ref w) = word {
             let title = if already_highlighted {
                 format!("Remove highlight: \"{w}\"")
@@ -464,9 +484,8 @@ impl LanguageServer for Backend {
             actions.push(CodeActionOrCommand::CodeAction(CodeAction {
                 title,
                 kind: Some(CodeActionKind::EMPTY),
-                // The `Command` is embedded in the `CodeAction` and passed back verbatim to `execute_command` when the
-                // user selects this item. We encode the word as the single argument so `execute_command` can toggle it
-                // without re-reading the cursor position.
+                // The [`Command`] is embedded in the [`CodeAction`] and passed back to [`Backend::execute_command]`
+                // when the user selects this item. We encode the word as the single argument.
                 command: Some(Command {
                     title: "Toggle Highlight".to_owned(),
                     command: "zed-highlight.toggle".to_owned(),
@@ -476,6 +495,7 @@ impl LanguageServer for Backend {
             }));
         }
 
+        // Clear all highlights action, only if there are any active highlights.
         if has_any {
             actions.push(CodeActionOrCommand::CodeAction(CodeAction {
                 title: "Clear all highlights".to_owned(),
@@ -492,16 +512,17 @@ impl LanguageServer for Backend {
         Ok(Some(actions))
     }
 
-    /// Called when the user selects a code action. We mutate state here, then call `immediate_refresh` to tell Zed to
-    /// re-request semantic tokens right away. `immediate_refresh` also cancels any pending debounced refresh to avoid
-    /// a redundant second re-request [`DEBOUNCE_DELAY_MS`] later.
+    /// Called when the user selects a code action in the "editor: toggle code actions" menu.
+    ///
+    /// We mutate state, then call [`Backend::immediate_refresh`] to tell Zed to re-request semantic tokens right away.
     async fn execute_command(
         &self,
         params: ExecuteCommandParams,
     ) -> Result<Option<serde_json::Value>> {
         match params.command.as_str() {
+            // Toggle the highlight of the word embedded in the command arguments.
             "zed-highlight.toggle" => {
-                // The word was embedded as the first argument by `code_action`.
+                // The word was embedded as the first argument by [`Backend::code_action`].
                 let word = params
                     .arguments
                     .into_iter()
@@ -512,12 +533,18 @@ impl LanguageServer for Backend {
                     self.immediate_refresh().await;
                 }
             }
+
+            // Clear all highlights by clearing the list of highlighted words.
             "zed-highlight.clear" => {
-                self.state.lock().await.words.clear();
+                self.state.lock().await.words_clear();
                 self.immediate_refresh().await;
             }
+
+            // Silently ignore unknown commands.
             _ => {}
         }
+
+        // No meaningful result to return.
         Ok(None)
     }
 }

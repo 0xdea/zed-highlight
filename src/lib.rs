@@ -76,7 +76,7 @@ impl ZedHighlightExtension {
             return Ok(path.clone());
         }
 
-        // Tell Zed UI we are checking for an update.
+        // Tell Zed we are checking for an update.
         zed::set_language_server_installation_status(
             language_server_id,
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
@@ -115,7 +115,7 @@ impl ZedHighlightExtension {
 
         // Download and extract the binary if it's not already present.
         if !fs::metadata(&binary_path).is_ok_and(|m| m.is_file()) {
-            // Tell Zed UI we are downloading the update.
+            // Tell Zed we are downloading the update.
             zed::set_language_server_installation_status(
                 language_server_id,
                 &zed::LanguageServerInstallationStatus::Downloading,
@@ -157,7 +157,7 @@ impl ZedHighlightExtension {
             }
         }
 
-        // Reset Zed UI language server installation status indicator.
+        // Reset Zed language server installation status indicator.
         zed::set_language_server_installation_status(
             language_server_id,
             &zed::LanguageServerInstallationStatus::None,
