@@ -308,13 +308,12 @@ impl Backend {
 
 /// LSP server's implementation.
 ///
-/// We implement the [`LanguageServer`] trait from tower-lsp, which requires us to define an async method for each LSP
-/// request/notification we want to handle. The [`Backend`] struct holds our shared state and client handle, and we
+/// We implement the [`LanguageServer`] trait from tower-lsp, which requires to define an async method for each LSP
+/// request/notification we want to handle. The [`Backend`] struct holds the shared state and client handle, and we
 /// dispatch to helper methods for the main logic.
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
-    /// Called once at server startup. We respond with our capabilities so Zed knows which features we support and how
-    /// to interact with us.
+    /// Called once at server startup. We respond with our capabilities so Zed knows which features we support.
     async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
@@ -343,18 +342,24 @@ impl LanguageServer for Backend {
                     ),
                 ),
 
-                // Code actions appear in the editor's lightbulb / ⌘. menu. We use them to surface "Highlight: word"
-                // and "Clear all" without requiring the user to bind a custom keymap entry.
+                // Code actions appear in the "editor: toggle code actions" menu (accessed with the ⌘. shortcut by
+                // default). We use them to surface "Highlight: word", "Remove highlight: word", and "Clear all
+                // highlights" actions without requiring the user to bind a custom keymap entry.
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
 
                 // Register each supported command name so Zed knows to route `executeCommand` calls to this server.
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec!["highlight.toggle".to_owned(), "highlight.clear".to_owned()],
+                    commands: vec![
+                        "zed-highlight.toggle".to_owned(),
+                        "zed-highlight.clear".to_owned(),
+                    ],
                     work_done_progress_options: WorkDoneProgressOptions::default(),
                 }),
 
                 ..Default::default()
             },
+
+            // Provide optional LSP server information.
             server_info: Some(ServerInfo {
                 name: PROGRAM.to_owned(),
                 version: Some(VERSION.to_owned()),
@@ -362,10 +367,10 @@ impl LanguageServer for Backend {
         })
     }
 
-    /// Called after `initialize`, once the client is ready to receive requests. Can be empty for this simple server.
+    /// Called after [`Backend::initialize`], once the client is ready to receive requests. Empty in our simple server.
     async fn initialized(&self, _: InitializedParams) {}
 
-    /// Called when the server is shutting down. We have no resources to clean up in this simple server.
+    /// Called when the server is shutting down. We have no resources to clean up in our simple server.
     async fn shutdown(&self) -> Result<()> {
         Ok(())
     }
@@ -464,7 +469,7 @@ impl LanguageServer for Backend {
                 // without re-reading the cursor position.
                 command: Some(Command {
                     title: "Toggle Highlight".to_owned(),
-                    command: "highlight.toggle".to_owned(),
+                    command: "zed-highlight.toggle".to_owned(),
                     arguments: Some(vec![serde_json::Value::String(w.clone())]),
                 }),
                 ..Default::default()
@@ -477,7 +482,7 @@ impl LanguageServer for Backend {
                 kind: Some(CodeActionKind::EMPTY),
                 command: Some(Command {
                     title: "Clear All Highlights".to_owned(),
-                    command: "highlight.clear".to_owned(),
+                    command: "zed-highlight.clear".to_owned(),
                     arguments: None,
                 }),
                 ..Default::default()
@@ -495,7 +500,7 @@ impl LanguageServer for Backend {
         params: ExecuteCommandParams,
     ) -> Result<Option<serde_json::Value>> {
         match params.command.as_str() {
-            "highlight.toggle" => {
+            "zed-highlight.toggle" => {
                 // The word was embedded as the first argument by `code_action`.
                 let word = params
                     .arguments
@@ -507,7 +512,7 @@ impl LanguageServer for Backend {
                     self.immediate_refresh().await;
                 }
             }
-            "highlight.clear" => {
+            "zed-highlight.clear" => {
                 self.state.lock().await.words.clear();
                 self.immediate_refresh().await;
             }
