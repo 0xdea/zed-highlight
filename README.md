@@ -34,15 +34,15 @@ The following features are currently supported by the extension and the bundled 
 
 ## Installing
 
-TODO - add instructions for installing via Zed's extension marketplace once it's published there.
-TODO - add instructions for installing the LSP server manually via `cargo install zed-highlight-lsp` + dev extension
+- TODO - add instructions for installing via Zed's extension marketplace once it's published there.
+- TODO - add instructions for installing the LSP server manually via `cargo install zed-highlight-lsp` + dev extension
 
 ## Usage
 
-Use zed-highlight as follows:
+Use the Zed Highlight extension as follows:
 
-TODO - add detailed instructions for using the extension, including custom keymap entries and configuration options.
-TODO - add instructions for configuring colors (e.g., via `settings.json`).
+- TODO - add detailed instructions for using the extension, including custom keymap entries and configuration options.
+- TODO - add instructions for configuring colors (e.g., via `settings.json`).
 
 ## Compatibility
 
