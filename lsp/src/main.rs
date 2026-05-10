@@ -245,20 +245,9 @@ impl Backend {
                 _ => continue,
             };
 
-            // Build the regex for this word, escaping it first so that punctuation is treated literally.
-            let escaped = regex::escape(word);
-            let mut pattern = if whole_word {
-                // The word-boundary assertion prevents "for" from matching inside "format".
-                format!(r"\b{escaped}\b")
-            } else {
-                escaped
-            };
-            if ignore_case {
-                // Make the entire pattern case-insensitive.
-                pattern = format!("(?i){pattern}");
-            }
-
-            let Ok(re) = Regex::new(&pattern) else {
+            // Compile the regex for this word.
+            let Some(re) = compile_word_regex(word, whole_word, ignore_case) else {
+                // If the regex fails to compile, skip this word.
                 continue;
             };
 
@@ -464,9 +453,10 @@ impl LanguageServer for Backend {
         };
         let has_any = state.has_any();
 
-        // Find the highlitable word the user is acting on, if any, and determine whether it's already highlighted.
-        let word =
-            word_at(&content, params.range).filter(|w| is_highlightable(w, state.whole_word));
+        // Find the highlightable word the user is acting on, if any, and determine whether it's already highlighted.
+        let word = word_at(&content, params.range)
+            .filter(|w| is_highlightable(w, state.whole_word))
+            .filter(|w| matches_anywhere(&content, w, state.whole_word, state.ignore_case));
         let already_highlighted = word.as_deref().is_some_and(|w| state.is_highlighted(w));
 
         // Explicitly release the lock before building the response.
@@ -668,6 +658,38 @@ fn word_at(content: &str, range: Range) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Helper function to check whether a given text produces at least one visible highlight in the current document under
+/// the current matching rules. We do not match in all open documents.
+///
+/// This is the strongest predicate we can use to decide if a code-action menu entry is worth showing: it asks the
+/// exact question whose answer determines whether the user would see anything change after toggling.
+fn matches_anywhere(content: &str, text: &str, whole_word: bool, ignore_case: bool) -> bool {
+    let Some(re) = compile_word_regex(text, whole_word, ignore_case) else {
+        return false;
+    };
+    content.lines().any(|line| re.is_match(line))
+}
+
+/// Helper function to compile a regex for a given word, escaping it first so that punctuation is treated literally and
+/// respecting the `whole_word` and `ignore_case` flags.
+///
+/// Returns `None` if the pattern fails to compile (extremely unlikely for an escaped literal).
+fn compile_word_regex(word: &str, whole_word: bool, ignore_case: bool) -> Option<Regex> {
+    // Treat the word as a literal string by escaping it.
+    let escaped = regex::escape(word);
+    let mut pattern = if whole_word {
+        // The word-boundary assertion prevents "for" from matching inside "format".
+        format!(r"\b{escaped}\b")
+    } else {
+        escaped
+    };
+    if ignore_case {
+        // Make the entire pattern case-insensitive.
+        pattern = format!("(?i){pattern}");
+    }
+    Regex::new(&pattern).ok()
 }
 
 /// Entry point of the LSP server.
