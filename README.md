@@ -18,6 +18,8 @@ Zed Highlight is a Language Server Protocol (LSP) extension for the [Zed](https:
 
 ## Features
 
+The following features are currently supported by the extension and the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp):
+
 - Easy access to the following code actions via the `editor: toggle code actions` menu (`⌘.` shortcut or lightning bolt icon in the gutter):
   - `Highlight` or `Remove highlight` - Toggle highlighting on and off for the current selection.
   - `Clear all highlights` - Remove all highlights with a single command.

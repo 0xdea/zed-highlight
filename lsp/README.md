@@ -45,7 +45,7 @@ cargo install --path lsp
 
 ## Usage
 
-The LSP server is automatically launched by the Zed Highlight extension when you open a file in Zed. Refer to the [main README](https://github.com/0xdea/zed-highlight/blob/master/README.md) for usage instructions.
+The LSP server is automatically launched by the [Zed Highlight](https://github.com/0xdea/zed-highlight) extension when you open a file in Zed. Refer to the [main README](https://github.com/0xdea/zed-highlight/blob/master/README.md) for usage instructions.
 
 ## Compatibility
 
