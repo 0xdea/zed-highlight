@@ -12,7 +12,7 @@
 >
 > -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
 
-Zed Highlight LSP is a Language Server implemented for the [Zed](https://zed.dev/) editor, designed to provide word highlighting via the [Zed Highlight](https://github.com/0xdea/zed-highlight) extension.
+Zed Highlight LSP is a Language Server implemented for the [Zed editor](https://zed.dev/), designed to provide word highlighting via the [Zed Highlight](https://github.com/0xdea/zed-highlight) extension.
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
