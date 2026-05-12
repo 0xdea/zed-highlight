@@ -42,7 +42,7 @@ The following features are currently supported by the extension and the bundled 
 Use the Zed Highlight extension as follows:
 
 - TODO - add detailed instructions for using the extension, including custom keymap entries and configuration options.
-- TODO - add instructions for configuring colors (e.g., via `settings.json`).
+- TODO - add instructions for configuring [syntax highlighting with semantic tokens](https://zed.dev/docs/extensions/languages#syntax-highlighting-with-semantic-tokens) (` "semantic_tokens": "combined",` or ` "semantic_tokens": "full"` ) and colors (e.g., via `settings.json`).
 
 ## Compatibility
 
