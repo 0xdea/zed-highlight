@@ -9,7 +9,6 @@ repository = "https://github.com/0xdea/zed-highlight"
 license = "MIT"
 keywords = ["zed", "zed-extension", "lsp-server", "vuln-dev", "code-review"]
 categories = ["security", "development-tools", "text-editors"]
-exclude = [".github/*", ".img/*", ".gitignore", ".taplo.toml", "extension.wasm"]
 publish = false
 
 [dependencies]
