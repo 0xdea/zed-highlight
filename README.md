@@ -35,14 +35,141 @@ The following features are currently supported by the extension and the bundled 
 ## Installing
 
 - TODO - add instructions for installing via Zed's extension marketplace once it's published there.
-- TODO - add instructions for installing the LSP server manually via `cargo install zed-highlight-lsp` + dev extension
+- TODO - add instructions for installing the LSP server manually via `cargo install zed-highlight-lsp` + dev extension (link)
+
+## Configuration
+
+- TODO - add detailed instructions for using the extension, including custom keymap entries and configuration options.
+
+Make sure [syntax highlighting with semantic tokens](https://zed.dev/docs/extensions/languages#syntax-highlighting-with-semantic-tokens) is enabled in `settings.json`, with e.g.:
+
+```json
+{
+  // enable combined semantic tokens (recommended)
+  "semantic_tokens": "combined"
+}
+```
+
+or:
+
+```json
+{
+  // enable full semantic tokens
+  "semantic_tokens": "full"
+}
+```
+
+Then, configure the colors for the semantic tokens provided by the extension (e.g., `zed-highlight-0` to `zed-highlight-7`) in `settings.json`. For example, you can use the following color schemes for dark themes:
+
+Example color configuration for semantic tokens in `settings.json` (dark themes):
+
+```json
+{
+  // zed-highlight extension colors (dark themes)
+  "global_lsp_settings": {
+    "semantic_token_rules": [
+      {
+        "token_type": "zed-highlight-0",
+        "foreground_color": "#F5B041",
+        "background_color": "#F5B04150"
+      },
+      {
+        "token_type": "zed-highlight-1",
+        "foreground_color": "#85C1E9",
+        "background_color": "#85C1E950"
+      },
+      {
+        "token_type": "zed-highlight-2",
+        "foreground_color": "#CD6155",
+        "background_color": "#CD615550"
+      },
+      {
+        "token_type": "zed-highlight-3",
+        "foreground_color": "#AF7AC5",
+        "background_color": "#AF7AC550"
+      },
+      {
+        "token_type": "zed-highlight-4",
+        "foreground_color": "#48C9B0",
+        "background_color": "#48C9B050"
+      },
+      {
+        "token_type": "zed-highlight-5",
+        "foreground_color": "#F4D03F",
+        "background_color": "#F4D03F50"
+      },
+      {
+        "token_type": "zed-highlight-6",
+        "foreground_color": "#52BE80",
+        "background_color": "#52BE8050"
+      },
+      {
+        "token_type": "zed-highlight-7",
+        "foreground_color": "#FF9933",
+        "background_color": "#FF993350"
+      }
+    ]
+  }
+}
+```
+
+Example color configuration for semantic tokens in `settings.json` (light themes):
+
+```json
+{
+  // zed-highlight extension colors (light themes)
+  "global_lsp_settings": {
+    "semantic_token_rules": [
+      {
+        "token_type": "zed-highlight-0",
+        "foreground_color": "#B3D9FF",
+        "background_color": "#B3D9FF50"
+      },
+      {
+        "token_type": "zed-highlight-1",
+        "foreground_color": "#B3B3FF",
+        "background_color": "#B3B3FF50"
+      },
+      {
+        "token_type": "zed-highlight-2",
+        "foreground_color": "#FFD9B3",
+        "background_color": "#FFD9B350"
+      },
+      {
+        "token_type": "zed-highlight-3",
+        "foreground_color": "#FFB3FF",
+        "background_color": "#FFB3FF50"
+      },
+      {
+        "token_type": "zed-highlight-4",
+        "foreground_color": "#B3FFB3",
+        "background_color": "#B3FFB350"
+      },
+      {
+        "token_type": "zed-highlight-5",
+        "foreground_color": "#D1E0E0",
+        "background_color": "#D1E0E050"
+      },
+      {
+        "token_type": "zed-highlight-6",
+        "foreground_color": "#FFFF80",
+        "background_color": "#FFFF8050"
+      },
+      {
+        "token_type": "zed-highlight-7",
+        "foreground_color": "#E6FFB3",
+        "background_color": "#E6FFB350"
+      }
+    ]
+  }
+}
+```
 
 ## Usage
 
 Use the Zed Highlight extension as follows:
 
-- TODO - add detailed instructions for using the extension, including custom keymap entries and configuration options.
-- TODO - add instructions for configuring [syntax highlighting with semantic tokens](https://zed.dev/docs/extensions/languages#syntax-highlighting-with-semantic-tokens) (` "semantic_tokens": "combined",` or ` "semantic_tokens": "full"` ) and colors (e.g., via `settings.json`).
+- TODO
 
 ## Compatibility
 
@@ -66,3 +193,7 @@ The latest release was tested with Zed 1.1.7 on:
 - Add customizable settings (e.g., `whole_word` and `ignore_case` flags that are already suppported by the LSP).
 - Add highlighting based on regular expressions.
 - Add a sidebar for navigation between currently highlighted words.
+
+```
+
+```
