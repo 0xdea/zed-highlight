@@ -1,7 +1,7 @@
 id = "zed-highlight"
 name = "Zed Highlight"
 description = "Highlight all occurrences of selected words with multiple cycling colors."
-version = "0.1.0"
+version = "0.1.1-alpha"
 schema_version = 1
 authors = ["Marco Ivaldi <raptor@0xdeadbeef.info>"]
 repository = "https://github.com/0xdea/zed-highlight"
