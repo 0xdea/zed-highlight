@@ -34,12 +34,19 @@ The following features are currently supported by the extension and the bundled 
 
 ## Installing
 
-- TODO - add instructions for installing via Zed's extension marketplace once it's published there.
-- TODO - add instructions for installing the LSP server manually via `cargo install zed-highlight-lsp` + dev extension (link)
+The easiest way to install the Zed Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/zed-highlight). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically.
+
+Alternatively, you can clone the repository and install both the extension and the LSP server manually. First, build the LSP server from source:
+
+```sh
+git clone https://github.com/0xdea/zed-highlight
+cd zed-highlight
+cargo install --path lsp
+```
+
+Then, in Zed, run `zed: install dev extension` from the command palette and select the `zed-highlight` directory in which you have cloned the repository.
 
 ## Configuration
-
-- TODO - add detailed instructions for using the extension, including custom keymap entries and configuration options.
 
 Make sure [syntax highlighting with semantic tokens](https://zed.dev/docs/extensions/languages#syntax-highlighting-with-semantic-tokens) is enabled in `settings.json`, with e.g.:
 
@@ -59,9 +66,7 @@ or:
 }
 ```
 
-Then, configure the colors for the semantic tokens provided by the extension (e.g., `zed-highlight-0` to `zed-highlight-7`) in `settings.json`. For example, you can use the following color schemes for dark themes:
-
-Example color configuration for semantic tokens in `settings.json` (dark themes):
+Then, configure the colors for the semantic tokens provided by the extension (e.g., `zed-highlight-0` to `zed-highlight-7`) in `settings.json`. For example, you can use the following color scheme for dark themes:
 
 ```json
 {
@@ -113,7 +118,7 @@ Example color configuration for semantic tokens in `settings.json` (dark themes)
 }
 ```
 
-Example color configuration for semantic tokens in `settings.json` (light themes):
+An alternative color scheme that should be more suitable for light themes is also provided below:
 
 ```json
 {
