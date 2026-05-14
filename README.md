@@ -176,7 +176,7 @@ An alternative color scheme that should be more suitable for light themes is als
 }
 ```
 
-The `50` suffix on background colors is an alpha value in hex (roughly 31% opacity). Adjust the colors and opacity to your taste.
+The `50` suffix on background colors is an alpha value in hex (roughly 31% opacity). You can adjust the colors and opacity to your taste.
 
 ## Usage
 
