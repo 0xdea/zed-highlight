@@ -16,13 +16,19 @@ Zed Highlight is a Language Server Protocol (LSP) extension for the [Zed editor]
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
+## How it works
+
+The extension runs a small [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) in the background. When you toggle a word, the server scans every supported open document for occurrences and returns them as semantic tokens. Zed colors those tokens using the rules you add to `settings.json`.
+
+Words are matched whole-word and case-sensitively by default. Up to 8 words can be highlighted simultaneously, each getting a distinct color. Adding a 9th word reuses the first color, and so on.
+
 ## Features
 
-The following features are currently supported by the extension and the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp):
+The following features are currently supported by the extension and the bundled LSP server:
 
 - Easy access to the following code actions via the `editor: toggle code actions` menu (`⌘.` shortcut or lightning bolt icon in the gutter):
   - `Highlight` or `Remove highlight` - Toggle highlighting on and off for the current selection.
-  - `Clear all highlights` - Remove all highlights with a single command.
+  - `Clear all highlights` - Remove all active highlights with a single command.
 - Configurable highlight colors (via `settings.json`).
 
 ## See also
@@ -34,7 +40,7 @@ The following features are currently supported by the extension and the bundled 
 
 ## Installing
 
-The easiest way to install the Zed Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/zed-highlight). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically.
+The easiest way to install the Zed Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/zed-highlight). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically on first use and will periodically check for updates.
 
 Alternatively, you can clone the repository and install both the extension and the LSP server manually. First, build the LSP server from source:
 
@@ -66,7 +72,7 @@ or:
 }
 ```
 
-Then, configure the colors for the semantic tokens provided by the extension (e.g., `zed-highlight-0` to `zed-highlight-7`) in `settings.json`. For example, you can use the following color scheme for dark themes:
+Then, configure the foreground and background colors for each of the 8 semantic token types emitted by the extension (i.e., `zed-highlight-0` to `zed-highlight-7`) in `settings.json`. For dark themes, you can use the following color scheme:
 
 ```json
 {
@@ -170,11 +176,14 @@ An alternative color scheme that should be more suitable for light themes is als
 }
 ```
 
+The `50` suffix on background colors is an alpha value in hex (roughly 31% opacity). Adjust the colors and opacity to your taste.
+
 ## Usage
 
-Use the Zed Highlight extension as follows:
+Place your cursor on a word (or select a range of text) and open the code actions menu via `editor: toggle code actions` in the command palette or by pressing the default shortcut `⌘.` (or the lightning bolt icon in the gutter). The following actions are available depending on context:
 
-- TODO
+- `Highlight` or `Remove highlight` - Toggle highlighting on and off for the current selection.
+- `Clear all highlights` - Remove all active highlights with a single command.
 
 ## Compatibility
 
