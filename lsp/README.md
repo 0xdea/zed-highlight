@@ -33,9 +33,7 @@ If you want to install it manually, you can do so via [crates.io](https://crates
 cargo install zed-highlight-lsp
 ```
 
-## Compiling
-
-Alternatively, you can build from [source](https://github.com/0xdea/zed-highlight):
+Alternatively, you can also build from [source](https://github.com/0xdea/zed-highlight):
 
 ```sh
 git clone https://github.com/0xdea/zed-highlight

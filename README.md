@@ -198,7 +198,3 @@ The latest release was tested with Zed 1.2.3 on:
 - Add customizable settings (e.g., `whole_word` and `ignore_case` flags that are already suppported by the LSP).
 - Add highlighting based on regular expressions.
 - Add a sidebar for navigation between currently highlighted words.
-
-```
-
-```
