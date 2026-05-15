@@ -1,5 +1,8 @@
 name: release
 
+permissions:
+  contents: read
+
 on:
   push:
     tags:
@@ -59,8 +62,10 @@ jobs:
           cache: false
       - name: build
         if: matrix.os != 'ubuntu-latest'
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
-          cargo build --release --manifest-path lsp/Cargo.toml --target ${{ matrix.target }}
+          cargo build --release --manifest-path lsp/Cargo.toml --target "$TARGET"
       - name: dependencies
         if: matrix.os == 'ubuntu-latest'
         uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
@@ -68,18 +73,27 @@ jobs:
           tool: cross
       - name: build-linux
         if: matrix.os == 'ubuntu-latest'
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
-          cross build --release --manifest-path lsp/Cargo.toml --target ${{ matrix.target }}
+          cross build --release --manifest-path lsp/Cargo.toml --target "$TARGET"
       - name: package
         if: matrix.os != 'windows-latest'
+        env:
+          TARGET: ${{ matrix.target }}
+          NAME: ${{ matrix.name }}
         run: |
-          cd target/${{ matrix.target }}/release
-          tar czf "../../../${{ matrix.name }}" zed-highlight-lsp
+          cd "target/$TARGET/release"
+          tar czf "../../../$NAME" zed-highlight-lsp
       - name: package-windows
         if: matrix.os == 'windows-latest'
+        env:
+          TARGET: ${{ matrix.target }}
+          NAME: ${{ matrix.name }}
+        shell: bash
         run: |
-          cd target/${{ matrix.target }}/release
-          tar czf "../../../${{ matrix.name }}" zed-highlight-lsp.exe
+          cd "target/TARGET/release"
+          tar czf "../../../$NAME" zed-highlight-lsp.exe
       - name: upload
         uses: actions/upload-artifact@v7
         with:
