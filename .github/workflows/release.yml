@@ -56,7 +56,7 @@ jobs:
         run: cargo build --release --manifest-path lsp/Cargo.toml --target ${{ matrix.target }}
       - name: package
         run: |
-          cd lsp/target/${{ matrix.target }}/release
+          cd target/${{ matrix.target }}/release
           tar czf "${{ matrix.asset }}" zed-highlight-lsp
           mv "${{ matrix.asset }}" ../../../../
       - name: upload
