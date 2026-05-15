@@ -57,14 +57,11 @@ jobs:
         run: cargo build --release --manifest-path lsp/Cargo.toml --target ${{ matrix.target }}
       - name: package
         run: |
-          # The archive must contain a single file named `zed-highlight-lsp` at its
-          # root so that download_file (GzipTar) extracts it as
-          # `{version_dir}/highlight-lsp` — matching the path in `src/lib.rs`.
           cd lsp/target/${{ matrix.target }}/release
-          tar czf "${{ matrix.asset }}" highlight-lsp
+          tar czf "${{ matrix.asset }}" zed-highlight-lsp
           mv "${{ matrix.asset }}" ../../../../
       - name: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.asset }}
           path: ${{ matrix.asset }}
@@ -77,11 +74,11 @@ jobs:
       contents: write
     steps:
       - name: download
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
       - name: publisn
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           files: "*.tar.gz"
           generate_release_notes: true
