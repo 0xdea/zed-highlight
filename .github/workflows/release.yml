@@ -58,7 +58,7 @@ jobs:
         run: |
           cd target/${{ matrix.target }}/release
           tar czf "${{ matrix.asset }}" zed-highlight-lsp
-          mv "${{ matrix.asset }}" ../../../../
+          mv "${{ matrix.asset }}" ../../../
       - name: upload
         uses: actions/upload-artifact@v7
         with:
