@@ -51,10 +51,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
+          persist-credentials: false
       - name: toolchain
         uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
         with:
           target: ${{ matrix.target }}
+          cache: false
       - name: build
         if: matrix.os != 'ubuntu-latest'
         run: |
@@ -95,7 +97,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           merge-multiple: true
-      - name: publisn
+      - name: publish
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           files: "*.tar.gz"
