@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add some supported languages to the extension manifest.
+- Add a GitHub Actions workflow to publish LSP server binaries to GitHub Releases on new version tags.
 
 ### Changed
 
