@@ -62,6 +62,8 @@ jobs:
       - name: dependencies
         if: matrix.os == 'ubuntu-latest'
         uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
+        with:
+          tool: cross
       - name: build-linux
         if: matrix.os == 'ubuntu-latest'
         run: |
