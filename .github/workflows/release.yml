@@ -47,16 +47,6 @@ jobs:
           #   name: zed-highlight-lsp-windows-aarch64.zip
           #   arch: aarch64
 
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            name: zed-highlight-lsp-linux-musl-x86_64.tar.gz
-            arch: x86_64
-
-          - target: aarch64-unknown-linux-musl
-            os: ubuntu-latest
-            name: zed-highlight-lsp-linux-musl-aarch64.tar.gz
-            arch: aarch64
-
     steps:
       - uses: actions/checkout@v6
         with:
@@ -65,17 +55,18 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - name: dependencies
-        if: matrix.target == 'x86_64-unknown-linux-musl' || matrix.target == 'aarch64-unknown-linux-musl'
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y musl-tools
       - name: build
         run: cargo build --release --manifest-path lsp/Cargo.toml --target ${{ matrix.target }}
       - name: package
+        if: matrix.os != 'windows-latest'
         run: |
           cd target/${{ matrix.target }}/release
           tar czf "../../../${{ matrix.name }}" zed-highlight-lsp
+      - name: package-windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf "../../../${{ matrix.name }}" zed-highlight-lsp.exe
       - name: upload
         uses: actions/upload-artifact@v7
         with:
