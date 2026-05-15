@@ -35,7 +35,7 @@ If you want to install it manually, you can do so via [crates.io](https://crates
 cargo install zed-highlight-lsp
 ```
 
-Alternatively, you can also build from [source](https://github.com/0xdea/zed-highlight):
+Alternatively, you can build it from [source](https://github.com/0xdea/zed-highlight):
 
 ```sh
 git clone https://github.com/0xdea/zed-highlight
@@ -45,7 +45,7 @@ cargo install --path lsp
 
 ## Usage
 
-The LSP server is automatically launched by the [Zed Highlight](https://github.com/0xdea/zed-highlight) extension when you open a supported file in Zed. Refer to the [main README](https://github.com/0xdea/zed-highlight/blob/master/README.md) for usage instructions.
+The LSP server is automatically launched by the [Zed Highlight](https://github.com/0xdea/zed-highlight) extension when you open a supported document in Zed. Refer to the [main README](https://github.com/0xdea/zed-highlight/blob/master/README.md) for full usage instructions.
 
 ## Compatibility
 
@@ -55,7 +55,7 @@ The latest release was tested with Zed 1.2.3 on:
 
 ## Credits
 
-- [@debugpig](https://github.com/debugpig) for their useful [vscode-extension-highlight](https://github.com/debugpig/vscode-extension-highlight), which served as a major inspiration for this project.
+- [@debugpig](https://github.com/debugpig) for their [vscode-extension-highlight](https://github.com/debugpig/vscode-extension-highlight), which served as a major inspiration for this project.
 
 ## Changelog
 

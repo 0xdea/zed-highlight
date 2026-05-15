@@ -14,7 +14,7 @@
 >
 > -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
 
-Zed Highlight is a Language Server Protocol (LSP) extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It is useful for quickly identifying all occurrences of selected words in the code, enhancing readability and navigation when tracing the program flow from input sources to potential vulnerability sinks.
+Zed Highlight is a Language Server Protocol (LSP) extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in the code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
@@ -42,9 +42,9 @@ The following features are currently supported by the extension and the bundled 
 
 ## Installing
 
-The easiest way to install the Zed Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/zed-highlight). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically on first use and will periodically check for updates.
+The easiest way to install the Zed Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/zed-highlight). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically on first use and will check for updates upon startup.
 
-Alternatively, you can clone the repository and install both the extension and the LSP server manually. First, build the LSP server from source:
+Alternatively, you can clone the repository and install both the extension and the LSP server manually. First, build the LSP server from source and install it:
 
 ```sh
 git clone https://github.com/0xdea/zed-highlight
@@ -52,7 +52,7 @@ cd zed-highlight
 cargo install --path lsp
 ```
 
-Then, in Zed, run `zed: install dev extension` from the command palette and select the `zed-highlight` directory in which you have cloned the repository.
+Then, in Zed, run `zed: install dev extension` from the command palette and select the `zed-highlight` directory in which you have previously cloned the repository.
 
 ## Configuration
 
@@ -126,7 +126,7 @@ Then, configure the foreground and background colors for each of the 8 semantic 
 }
 ```
 
-An alternative color scheme that should be more suitable for light themes is also provided below:
+An alternative color scheme that should be more suitable for light themes is provided below:
 
 ```json
 {
@@ -182,7 +182,7 @@ The `50` suffix on background colors is an alpha value in hex (roughly 31% opaci
 
 ## Usage
 
-Place your cursor on a word (or select a range of text) and open the code actions menu via `editor: toggle code actions` in the command palette or by pressing the default shortcut `⌘.` (or the lightning bolt icon in the gutter). The following actions are available depending on context:
+Place the cursor on a word (or select a range of text) and open the code actions menu via `editor: toggle code actions` in the command palette or by pressing the default shortcut `⌘.` (or the lightning bolt icon in the gutter). The following actions are available depending on context:
 
 - `Highlight` or `Remove highlight` - Toggle highlighting on and off for the current selection.
 - `Clear all highlights` - Remove all active highlights with a single command.
@@ -195,7 +195,7 @@ The latest release was tested with Zed 1.2.3 on:
 
 ## Credits
 
-- [@debugpig](https://github.com/debugpig) for their useful [vscode-extension-highlight](https://github.com/debugpig/vscode-extension-highlight), which served as a major inspiration for this project.
+- [@debugpig](https://github.com/debugpig) for their [vscode-extension-highlight](https://github.com/debugpig/vscode-extension-highlight), which served as a major inspiration for this project.
 
 ## Changelog
 
@@ -203,9 +203,8 @@ The latest release was tested with Zed 1.2.3 on:
 
 ## TODO
 
-- Test with both light and dark themes. Then, release to the Zed marketplace and [crates.io](https://crates.io/).
-- Try another approach to implementing colors via LSP (e.g., the `textDocument/documentColor` capability).
-- Add a command-line interface for manual use of the LSP server outside of Zed.
+- Release to the Zed marketplace and [crates.io](https://crates.io/).
+- Add a minimal command-line interface for manual use of the LSP server outside of Zed.
 - Add customizable settings (e.g., `whole_word` and `ignore_case` flags that are already suppported by the LSP).
 - Add highlighting based on regular expressions.
 - Add a sidebar for navigation between currently highlighted words.
