@@ -39,9 +39,8 @@ jobs:
         with:
           submodules: true
       - name: toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+        uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
           targets: ${{ matrix.target }}
       - name: dependencies
         if: runner.os == 'Linux'
