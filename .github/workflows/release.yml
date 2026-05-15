@@ -95,7 +95,7 @@ jobs:
           NAME: ${{ matrix.name }}
         shell: bash
         run: |
-          cd "target/TARGET/release"
+          cd "target/$TARGET/release"
           tar czf "../../../$NAME" zed-highlight-lsp.exe
       - name: upload
         uses: actions/upload-artifact@v7
