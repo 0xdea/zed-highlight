@@ -6,7 +6,9 @@
 [![](https://img.shields.io/badge/zed-1.2.3-violet)](https://zed.dev/)
 [![](https://img.shields.io/badge/twitter-%400xdea-blue.svg)](https://twitter.com/0xdea)
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
-[![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
+[![check](https://github.com/0xdea/zed-highlight/actions/workflows/check.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/check.yml)
+[![release](https://github.com/0xdea/zed-highlight/actions/workflows/release.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/release.yml)
+[![extension](https://github.com/0xdea/zed-highlight/actions/workflows/extension.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/extension.yml)
 
 > "Free as in use-after."
 >
