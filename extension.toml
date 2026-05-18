@@ -1,13 +1,13 @@
-id = "zighlight"
-name = "Zighlight"
+id = "highlight"
+name = "Highlight"
 version = "0.1.1-alpha"
 authors = ["Marco Ivaldi <raptor@0xdeadbeef.info>"]
-description = "Highlight all occurrences of selected words with multiple cycling colors."
+description = "Highlight all occurrences of selected words with multiple colors to quickly identify them in the code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks."
 repository = "https://github.com/0xdea/zed-highlight"
 schema_version = 1
 
 [language_servers.zed-highlight-lsp]
-name = "Zed Highlight LSP"
+name = "Highlight LSP"
 languages = [
     "Bash",
     "C",

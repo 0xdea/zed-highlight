@@ -48,14 +48,14 @@ const DEBOUNCE_DELAY_MS: u64 = 250;
 /// },
 /// ```
 static TOKEN_TYPE_NAMES: [&str; NUM_COLORS] = [
-    "zighlight-0",
-    "zighlight-1",
-    "zighlight-2",
-    "zighlight-3",
-    "zighlight-4",
-    "zighlight-5",
-    "zighlight-6",
-    "zighlight-7",
+    "zed-highlight-0",
+    "zed-highlight-1",
+    "zed-highlight-2",
+    "zed-highlight-3",
+    "zed-highlight-4",
+    "zed-highlight-5",
+    "zed-highlight-6",
+    "zed-highlight-7",
 ];
 
 /// LSP server's internal state.
@@ -343,7 +343,10 @@ impl LanguageServer for Backend {
 
                 // Register each supported command name so Zed knows to route `executeCommand` calls to this server.
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec!["zighlight.toggle".to_owned(), "zighlight.clear".to_owned()],
+                    commands: vec![
+                        "zed-highlight.toggle".to_owned(),
+                        "zed-highlight.clear".to_owned(),
+                    ],
                     work_done_progress_options: WorkDoneProgressOptions::default(),
                 }),
 
@@ -476,7 +479,7 @@ impl LanguageServer for Backend {
                 // when the user selects this item. We encode the word as the single argument.
                 command: Some(Command {
                     title: "Toggle Highlight".to_owned(),
-                    command: "zighlight.toggle".to_owned(),
+                    command: "zed-highlight.toggle".to_owned(),
                     arguments: Some(vec![serde_json::Value::String(w.clone())]),
                 }),
                 ..Default::default()
@@ -490,7 +493,7 @@ impl LanguageServer for Backend {
                 kind: Some(CodeActionKind::EMPTY),
                 command: Some(Command {
                     title: "Clear All Highlights".to_owned(),
-                    command: "zighlight.clear".to_owned(),
+                    command: "zed-highlight.clear".to_owned(),
                     arguments: None,
                 }),
                 ..Default::default()
@@ -509,7 +512,7 @@ impl LanguageServer for Backend {
     ) -> Result<Option<serde_json::Value>> {
         match params.command.as_str() {
             // Toggle the highlight of the word embedded in the command arguments.
-            "zighlight.toggle" => {
+            "zed-highlight.toggle" => {
                 // The word was embedded as the first argument by [`Backend::code_action`].
                 let word = params
                     .arguments
@@ -534,7 +537,7 @@ impl LanguageServer for Backend {
             }
 
             // Clear all highlights by clearing the list of highlighted words.
-            "zighlight.clear" => {
+            "zed-highlight.clear" => {
                 self.state.lock().await.words_clear();
                 self.immediate_refresh().await;
             }
