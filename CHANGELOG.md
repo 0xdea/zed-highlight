@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rename Zed Highlight to Zighlight to follow the naming convention of Zed extensions.
 - Specify stricter version requirements for dependencies.
 - Update documentation and polish everything for release.
 

@@ -14,7 +14,7 @@
 >
 > -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
 
-Zed Highlight is a Language Server Protocol (LSP) extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in the code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
+Zighlight (Zed Highlight) is a Language Server Protocol (LSP) extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in the code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
@@ -42,7 +42,7 @@ The following features are currently supported by the extension and the bundled 
 
 ## Installing
 
-The easiest way to install the Zed Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/zed-highlight). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically on first use and will check for updates upon startup.
+The easiest way to install the Zighlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/zed-highlight). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically on first use and will check for updates upon startup.
 
 Alternatively, you can clone the repository and install both the extension and the LSP server manually. First, build the LSP server from source and install it:
 
@@ -74,50 +74,50 @@ or:
 }
 ```
 
-Then, configure the foreground and background colors for each of the 8 semantic token types emitted by the extension (i.e., `zed-highlight-0` to `zed-highlight-7`) in `settings.json`. For dark themes, you can use the following color scheme:
+Then, configure the foreground and background colors for each of the 8 semantic token types emitted by the extension (i.e., `zighlight-0` to `zighlight-7`) in `settings.json`. For dark themes, you can use the following color scheme:
 
 ```json
 {
-  // zed-highlight extension colors (dark themes)
+  // zighlight extension colors (dark themes)
   "global_lsp_settings": {
     "semantic_token_rules": [
       {
-        "token_type": "zed-highlight-0",
+        "token_type": "zighlight-0",
         "foreground_color": "#F5B041",
         "background_color": "#F5B04150"
       },
       {
-        "token_type": "zed-highlight-1",
+        "token_type": "zighlight-1",
         "foreground_color": "#85C1E9",
         "background_color": "#85C1E950"
       },
       {
-        "token_type": "zed-highlight-2",
+        "token_type": "zighlight-2",
         "foreground_color": "#CD6155",
         "background_color": "#CD615550"
       },
       {
-        "token_type": "zed-highlight-3",
+        "token_type": "zighlight-3",
         "foreground_color": "#AF7AC5",
         "background_color": "#AF7AC550"
       },
       {
-        "token_type": "zed-highlight-4",
+        "token_type": "zighlight-4",
         "foreground_color": "#48C9B0",
         "background_color": "#48C9B050"
       },
       {
-        "token_type": "zed-highlight-5",
+        "token_type": "zighlight-5",
         "foreground_color": "#F4D03F",
         "background_color": "#F4D03F50"
       },
       {
-        "token_type": "zed-highlight-6",
+        "token_type": "zighlight-6",
         "foreground_color": "#52BE80",
         "background_color": "#52BE8050"
       },
       {
-        "token_type": "zed-highlight-7",
+        "token_type": "zighlight-7",
         "foreground_color": "#FF9933",
         "background_color": "#FF993350"
       }
@@ -130,46 +130,46 @@ An alternative color scheme that should be more suitable for light themes is pro
 
 ```json
 {
-  // zed-highlight extension colors (light themes)
+  // zighlight extension colors (light themes)
   "global_lsp_settings": {
     "semantic_token_rules": [
       {
-        "token_type": "zed-highlight-0",
+        "token_type": "zighlight-0",
         "foreground_color": "#B3D9FF",
         "background_color": "#B3D9FF50"
       },
       {
-        "token_type": "zed-highlight-1",
+        "token_type": "zighlight-1",
         "foreground_color": "#B3B3FF",
         "background_color": "#B3B3FF50"
       },
       {
-        "token_type": "zed-highlight-2",
+        "token_type": "zighlight-2",
         "foreground_color": "#FFD9B3",
         "background_color": "#FFD9B350"
       },
       {
-        "token_type": "zed-highlight-3",
+        "token_type": "zighlight-3",
         "foreground_color": "#FFB3FF",
         "background_color": "#FFB3FF50"
       },
       {
-        "token_type": "zed-highlight-4",
+        "token_type": "zighlight-4",
         "foreground_color": "#B3FFB3",
         "background_color": "#B3FFB350"
       },
       {
-        "token_type": "zed-highlight-5",
+        "token_type": "zighlight-5",
         "foreground_color": "#D1E0E0",
         "background_color": "#D1E0E050"
       },
       {
-        "token_type": "zed-highlight-6",
+        "token_type": "zighlight-6",
         "foreground_color": "#FFFF80",
         "background_color": "#FFFF8050"
       },
       {
-        "token_type": "zed-highlight-7",
+        "token_type": "zighlight-7",
         "foreground_color": "#E6FFB3",
         "background_color": "#E6FFB350"
       }

@@ -14,7 +14,7 @@
 >
 > -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
 
-Zed Highlight LSP is a Language Server implemented for the [Zed editor](https://zed.dev/), designed to provide word highlighting via the [Zed Highlight](https://github.com/0xdea/zed-highlight) extension.
+Zed Highlight LSP is a Language Server implemented for the [Zed editor](https://zed.dev/), designed to provide word highlighting via the [Zighlight](https://github.com/0xdea/zed-highlight) extension.
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
@@ -27,7 +27,7 @@ Zed Highlight LSP is a Language Server implemented for the [Zed editor](https://
 
 ## Installing
 
-For regular use, Zed Highlight LSP is installed automatically by the [Zed Highlight](https://github.com/0xdea/zed-highlight) extension.
+For regular use, Zed Highlight LSP is installed automatically by the [Zighlight](https://github.com/0xdea/zed-highlight) extension.
 
 If you want to install it manually, you can do so via [crates.io](https://crates.io/crates/zed-highlight-lsp):
 
@@ -45,7 +45,7 @@ cargo install --path lsp
 
 ## Usage
 
-The LSP server is automatically launched by the [Zed Highlight](https://github.com/0xdea/zed-highlight) extension when you open a supported document in Zed. Refer to the [main README](https://github.com/0xdea/zed-highlight/blob/master/README.md) for full usage instructions.
+The LSP server is automatically launched by the [Zighlight](https://github.com/0xdea/zed-highlight) extension when you open a supported document in Zed. Refer to the [main README](https://github.com/0xdea/zed-highlight/blob/master/README.md) for full usage instructions.
 
 ## Compatibility
 
