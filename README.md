@@ -14,7 +14,7 @@
 >
 > -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
 
-Highlight is a Language Server Protocol (LSP) extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
+[Highlight](https://zed.dev/extensions/html/highlight) is a Language Server Protocol (LSP) extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
@@ -42,7 +42,7 @@ The following features are currently supported by the extension and the bundled 
 
 ## Installing
 
-The easiest way to install the Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/zed-highlight). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically on first use and will check for updates upon startup.
+The easiest way to install the Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/highlight). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically on first use and will check for updates upon startup.
 
 Alternatively, you can clone the repository and install both the extension and the LSP server manually. First, build the LSP server from source and install it:
 
