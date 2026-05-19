@@ -14,7 +14,7 @@
 >
 > -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
 
-Highlight LSP is a Language Server implemented for the [Zed editor](https://zed.dev/), designed to provide word highlighting via the [Highlight](https://github.com/0xdea/zed-highlight) extension.
+Highlight LSP is a language server implemented for the [Zed editor](https://zed.dev/), designed to provide word highlighting via the [Highlight](https://github.com/0xdea/zed-highlight) extension.
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
@@ -45,7 +45,7 @@ cargo install --path lsp
 
 ## Usage
 
-The LSP server is automatically launched by the [Highlight](https://zed.dev/extensions/html/highlight) extension when you open a supported document in Zed. Refer to the [main README](https://github.com/0xdea/zed-highlight/blob/master/README.md) for full usage instructions.
+The LSP server is automatically launched by the [Highlight](https://zed.dev/extensions/html/highlight) extension when you open a supported document in Zed. Refer to the [extension README](https://github.com/0xdea/zed-highlight/blob/master/README.md) for full usage instructions.
 
 ## Compatibility
 

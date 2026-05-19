@@ -14,7 +14,7 @@
 >
 > -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
 
-[Highlight](https://zed.dev/extensions/html/highlight) is a Language Server Protocol (LSP) extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
+[Highlight](https://zed.dev/extensions/html/highlight) is a language extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
@@ -53,6 +53,12 @@ cargo install --path lsp
 ```
 
 Then, in Zed, run `zed: install dev extension` from the command palette and select the `zed-highlight` directory in which you have previously cloned the repository.
+
+Highlight LSP is also available on [crates.io](https://crates.io/crates/zed-highlight-lsp):
+
+```sh
+cargo install zed-highlight-lsp
+```
 
 ## Configuration
 
@@ -206,5 +212,6 @@ The latest release was tested with Zed 1.2.3 on:
 - Release to the Zed marketplace and [crates.io](https://crates.io/).
 - Add a minimal command-line interface for manual use of the LSP server outside of Zed.
 - Add customizable settings (e.g., `whole_word` and `ignore_case` flags that are already suppported by the LSP).
+- Investigate whether it's possible to ship a default `semantic_token_rules.json` file with the extension.
 - Add highlighting based on regular expressions.
 - Add a sidebar for navigation between currently highlighted words.
