@@ -13,14 +13,14 @@ const REPOSITORY: &str = "0xdea/zed-highlight";
 const BINARY_NAME: &str = "zed-highlight-lsp";
 
 /// Zed extension that allows to highlight all occurrences of selected words.
-struct ZedHighlightExtension {
+struct HighlightExtension {
     /// In-process cache of the resolved binary path. Avoids a redundant `fs::metadata` call on every
     /// `language_server_command` invocation within the same Zed session. Not persisted across restarts;
     /// the versioned directory on disk serves that role.
     cached_binary_path: Option<String>,
 }
 
-impl zed::Extension for ZedHighlightExtension {
+impl zed::Extension for HighlightExtension {
     /// Construct a new instance of the extension.
     fn new() -> Self {
         Self {
@@ -57,7 +57,7 @@ impl zed::Extension for ZedHighlightExtension {
     }
 }
 
-impl ZedHighlightExtension {
+impl HighlightExtension {
     /// Ensure the language server binary is available and return its path. If the binary is not already cached and
     /// valid, check GitHub for the latest release, download the appropriate prebuilt binary for the current platform,
     /// and cache its path for future use.
@@ -173,7 +173,7 @@ impl ZedHighlightExtension {
 mod register {
     // The `register_extension!` macro expands to `pub` glue items that the WASM host imports by name.
     // Wrapping the call in a module prevents the `missing_docs` lint from firing.
-    super::zed::register_extension!(super::ZedHighlightExtension);
+    super::zed::register_extension!(super::HighlightExtension);
 }
 
 // TODO: add tests.
