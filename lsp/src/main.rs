@@ -235,7 +235,7 @@ impl Backend {
             )
         };
 
-        // Collect all matches as absolute (`line`, `start`, `length`, `token_type`) tuples.
+        // Collect all matches as absolute (`line`, `start`, `length`, `token_type`) 4-tuples.
         let mut raw: Vec<(u32, u32, u32, u32)> = Vec::new();
 
         for (color_idx, opt) in words.iter().enumerate() {
@@ -704,6 +704,7 @@ async fn main() {
     Server::new(stdin, stdout, socket).serve(service).await;
 }
 
+/// Unit tests.
 #[expect(clippy::unwrap_used, reason = "tests can use `unwrap`")]
 #[cfg(test)]
 mod tests {
@@ -1300,5 +1301,358 @@ mod tests {
         // Selecting only whitespace (e.g., a space) should yield None.
         let range = make_range(0, 3, 0, 4); // the space in "foo bar"
         assert_eq!(word_at("foo bar", range), None);
+    }
+}
+
+/// Integration tests.
+#[expect(clippy::unwrap_used, reason = "tests can use `unwrap`")]
+#[cfg(test)]
+mod integration {
+    use tower::{Service as _, ServiceExt as _};
+
+    use super::*;
+
+    /// Service type used across all integration tests.
+    type Svc = LspService<Backend>;
+
+    /// Stable document URI reused by all tests; the service is fresh per test so there's no cross-test state.
+    const URI: &str = "file:///test.txt";
+
+    /// Serialize `req` as a JSON-RPC request, drive it through the service, and return the serialized response.
+    /// Notifications (no `id` field) produce `None`; requests produce `Some(response_json)`.
+    async fn call_inner(svc: &mut Svc, req: serde_json::Value) -> Option<serde_json::Value> {
+        let req: tower_lsp::jsonrpc::Request = serde_json::from_value(req).unwrap();
+        let res = svc.ready().await.unwrap().call(req).await.unwrap();
+        res.map(|r| serde_json::to_value(r).unwrap())
+    }
+
+    /// Create a fresh service and complete the mandatory LSP handshake (`initialize` -> `initialized`).
+    /// The `ClientSocket` (used for server-to-client notifications) is dropped immediately; the backend
+    /// ignores send errors with `let _ =`, so this is safe and avoids keeping a handle we don't need.
+    async fn make_service() -> Svc {
+        let (mut svc, socket) = LspService::new(Backend::new);
+        drop(
+            call_inner(
+                &mut svc,
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": 0,
+                    "method": "initialize",
+                    "params": { "capabilities": {} }
+                }),
+            )
+            .await,
+        );
+        drop(
+            call_inner(
+                &mut svc,
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "method": "initialized",
+                    "params": {}
+                }),
+            )
+            .await,
+        );
+        drop(socket);
+        svc
+    }
+
+    /// Register a document via `textDocument/didOpen` so it's available in `state.docs`.
+    async fn open(svc: &mut Svc, uri: &str, text: &str) {
+        drop(
+            call_inner(
+                svc,
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "method": "textDocument/didOpen",
+                    "params": {
+                        "textDocument": {
+                            "uri": uri,
+                            "languageId": "plaintext",
+                            "version": 1,
+                            "text": text
+                        }
+                    }
+                }),
+            )
+            .await,
+        );
+    }
+
+    /// Replace a document's full text via `textDocument/didChange` (FULL sync: one change, no range).
+    async fn change(svc: &mut Svc, uri: &str, text: &str) {
+        drop(
+            call_inner(
+                svc,
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "method": "textDocument/didChange",
+                    "params": {
+                        "textDocument": { "uri": uri, "version": 2 },
+                        "contentChanges": [{ "text": text }]
+                    }
+                }),
+            )
+            .await,
+        );
+    }
+
+    /// Evict a document from `state.docs` via `textDocument/didClose`.
+    async fn close(svc: &mut Svc, uri: &str) {
+        drop(
+            call_inner(
+                svc,
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "method": "textDocument/didClose",
+                    "params": {
+                        "textDocument": { "uri": uri }
+                    }
+                }),
+            )
+            .await,
+        );
+    }
+
+    /// Toggle a word on/off via `workspace/executeCommand` -> `zed-highlight.toggle`.
+    /// `id` must be unique per test to satisfy the JSON-RPC request/response pairing.
+    async fn toggle(svc: &mut Svc, id: u32, word: &str) {
+        drop(
+            call_inner(
+                svc,
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "method": "workspace/executeCommand",
+                    "params": {
+                        "command": "zed-highlight.toggle",
+                        "arguments": [word]
+                    }
+                }),
+            )
+            .await,
+        );
+    }
+
+    /// Remove all highlighted words via `workspace/executeCommand` -> `zed-highlight.clear`.
+    async fn clear(svc: &mut Svc, id: u32) {
+        drop(
+            call_inner(
+                svc,
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "method": "workspace/executeCommand",
+                    "params": {
+                        "command": "zed-highlight.clear"
+                    }
+                }),
+            )
+            .await,
+        );
+    }
+
+    /// Request the full semantic token list for a document and return the raw flat `data` array. Each token is encoded
+    /// as 5 consecutive u32s: `delta_line`, `delta_start`, `length`, `token_type`, `token_modifiers`.
+    async fn get_tokens(svc: &mut Svc, id: u32, uri: &str) -> Vec<u32> {
+        let res = call_inner(
+            svc,
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "method": "textDocument/semanticTokens/full",
+                "params": {
+                    "textDocument": { "uri": uri }
+                }
+            }),
+        )
+        .await
+        .unwrap();
+        res["result"]["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| u32::try_from(v.as_u64().unwrap()).unwrap())
+            .collect()
+    }
+
+    /// Convert the flat token array into (`delta_line`, `delta_start`, `length`, `token_type`) 4-tuples,
+    /// dropping the always-zero `token_modifiers_bitset` field.
+    fn decode_tokens(data: &[u32]) -> Vec<(u32, u32, u32, u32)> {
+        data.chunks_exact(5)
+            .map(|c| (c[0], c[1], c[2], c[3]))
+            .collect()
+    }
+
+    /// Baseline: no highlighted words -> no tokens emitted.
+    #[tokio::test]
+    async fn tokens_empty_without_highlighted_words() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "hello world").await;
+        let data = get_tokens(&mut svc, 1, URI).await;
+        assert!(data.is_empty(), "no tokens when no words are highlighted");
+    }
+
+    /// End-to-end smoke test: one word toggled, one occurrence in document -> verify exact 5-tuple encoding.
+    #[tokio::test]
+    async fn tokens_single_word_single_occurrence() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "hello world").await;
+        toggle(&mut svc, 1, "hello").await;
+        let data = get_tokens(&mut svc, 2, URI).await;
+        assert_eq!(
+            data,
+            [0, 0, 5, 0, 0],
+            "one token: delta_line=0, delta_start=0, len=5, type=0, mods=0"
+        );
+    }
+
+    /// When two tokens share a line, the second token's `delta_start` is relative to the first token's start column.
+    #[tokio::test]
+    async fn tokens_same_line_delta_encoding() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "foo foo").await;
+        toggle(&mut svc, 1, "foo").await;
+        let data = get_tokens(&mut svc, 2, URI).await;
+        assert_eq!(
+            data,
+            [0, 0, 3, 0, 0, 0, 4, 3, 0, 0],
+            "second token delta_start is relative to first (4 chars apart on same line)"
+        );
+    }
+
+    /// When a token is on a different line than the previous one, `delta_start` resets to the absolute column rather
+    /// than being relative to the previous token. This is mandated by the LSP spec.
+    #[tokio::test]
+    async fn tokens_cross_line_delta_encoding() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "foo\nfoo").await;
+        toggle(&mut svc, 1, "foo").await;
+        let data = get_tokens(&mut svc, 2, URI).await;
+        assert_eq!(
+            data,
+            [0, 0, 3, 0, 0, 1, 0, 3, 0, 0],
+            "cross-line token resets delta_start to absolute column"
+        );
+    }
+
+    /// Each word occupies its own slot in `state.words`; the slot index maps to a distinct token type, which Zed
+    /// resolves to a different highlight color via `semantic_token_rules`.
+    #[tokio::test]
+    async fn tokens_two_words_get_distinct_types() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "foo bar").await;
+        toggle(&mut svc, 1, "foo").await;
+        toggle(&mut svc, 2, "bar").await;
+        let data = get_tokens(&mut svc, 3, URI).await;
+        let decoded = decode_tokens(&data);
+        assert_eq!(
+            decoded,
+            [(0, 0, 3, 0), (0, 4, 3, 1)],
+            "first toggled word gets type 0, second gets type 1"
+        );
+    }
+
+    /// A second toggle on the same word soft-deletes it (sets its slot to `None`); `build_tokens` skips `None` slots.
+    #[tokio::test]
+    async fn tokens_toggled_off_word_produces_no_tokens() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "hello world").await;
+        toggle(&mut svc, 1, "hello").await;
+        toggle(&mut svc, 2, "hello").await;
+        let data = get_tokens(&mut svc, 3, URI).await;
+        assert!(data.is_empty(), "toggled-off word must produce no tokens");
+    }
+
+    /// `zed-highlight.clear` calls `words_clear`, which drops all slots at once.
+    #[tokio::test]
+    async fn tokens_clear_removes_all() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "hello world").await;
+        toggle(&mut svc, 1, "hello").await;
+        toggle(&mut svc, 2, "world").await;
+        clear(&mut svc, 3).await;
+        let data = get_tokens(&mut svc, 4, URI).await;
+        assert!(data.is_empty(), "clear must remove all highlighted words");
+    }
+
+    /// `token type = slot_index % NUM_COLORS` (8), so the 9th word wraps back to type 0 and shares a color with the
+    /// first word.
+    #[tokio::test]
+    async fn tokens_color_wraps_past_num_colors() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "w0 w1 w2 w3 w4 w5 w6 w7 w8").await;
+        for (id, w) in (1_u32..).zip(["w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8"]) {
+            toggle(&mut svc, id, w).await;
+        }
+        let data = get_tokens(&mut svc, 10, URI).await;
+        assert_eq!(data.len(), 9 * 5, "nine tokens, each with 5 fields");
+        assert_eq!(data[3], 0, "first word (w0) gets token type 0");
+        assert_eq!(data[43], 0, "ninth word (w8) wraps back to token type 0");
+    }
+
+    /// Default whole-word mode wraps the pattern in `\b...\b`, so "foo" does not match inside "foobar".
+    #[tokio::test]
+    async fn tokens_whole_word_excludes_substrings() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "foobar foo").await;
+        toggle(&mut svc, 1, "foo").await;
+        let data = get_tokens(&mut svc, 2, URI).await;
+        assert_eq!(
+            data,
+            [0, 7, 3, 0, 0],
+            "whole-word mode must not match `foo` inside `foobar`; only standalone `foo` at col 7"
+        );
+    }
+
+    /// `textDocument/didChange` replaces the stored document text, so `build_tokens` sees the new content on the very
+    /// next `semanticTokens/full` request.
+    #[tokio::test]
+    async fn tokens_did_change_updates_document() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "hello world").await;
+        toggle(&mut svc, 1, "foo").await;
+        let data1 = get_tokens(&mut svc, 2, URI).await;
+        assert!(
+            data1.is_empty(),
+            "initially no tokens because document lacks `foo`"
+        );
+        change(&mut svc, URI, "foo bar").await;
+        let data2 = get_tokens(&mut svc, 3, URI).await;
+        assert_eq!(
+            data2,
+            [0, 0, 3, 0, 0],
+            "token appears after document is updated with `foo`"
+        );
+    }
+
+    /// `textDocument/didClose` removes the document from `state.docs`; `build_tokens` returns an empty list when the
+    /// document is absent rather than panicking or returning stale data.
+    #[tokio::test]
+    async fn tokens_did_close_evicts_document() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "hello world").await;
+        toggle(&mut svc, 1, "hello").await;
+        let data1 = get_tokens(&mut svc, 2, URI).await;
+        assert!(!data1.is_empty(), "token present before close");
+        close(&mut svc, URI).await;
+        let data2 = get_tokens(&mut svc, 3, URI).await;
+        assert!(data2.is_empty(), "evicted document returns no tokens");
+    }
+
+    /// The LSP spec requires character offsets in UTF-16 code units, not bytes. '中' and '文' are each 1 UTF-16 unit
+    /// but 3 UTF-8 bytes, so "foo" at UTF-16 offset 3 must not be reported at byte offset 7.
+    #[tokio::test]
+    async fn tokens_utf16_offsets_with_multibyte() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "中文 foo").await;
+        toggle(&mut svc, 1, "foo").await;
+        let data = get_tokens(&mut svc, 2, URI).await;
+        assert_eq!(
+            data,
+            [0, 3, 3, 0, 0],
+            "delta_start must be UTF-16 offset (3), not byte offset (7)"
+        );
     }
 }
