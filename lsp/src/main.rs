@@ -1047,14 +1047,20 @@ mod tests {
     }
 
     #[test]
-    fn is_highlightable_any_nonempty_without_whole_word() {
+    fn is_highlightable_nonword_chars_in_whole_word_mode_false() {
+        assert!(!is_highlightable(".", true));
+        assert!(!is_highlightable("()", true));
+    }
+
+    #[test]
+    fn is_highlightable_any_nonempty_without_whole_word_mode_true() {
         assert!(is_highlightable("foo", false));
         assert!(is_highlightable("(bar)", false));
         assert!(is_highlightable("foo bar", false));
     }
 
     #[test]
-    fn is_highlightable_identifier_in_whole_word_mode() {
+    fn is_highlightable_identifier_in_whole_word_mode_true() {
         assert!(is_highlightable("foo", true));
         assert!(is_highlightable("foo_bar", true));
         assert!(is_highlightable("foo123", true));
@@ -1062,24 +1068,40 @@ mod tests {
     }
 
     #[test]
-    fn is_highlightable_leading_nonword_char_fails_whole_word() {
+    fn is_highlightable_leading_nonword_char_in_whole_word_mode_false() {
         assert!(!is_highlightable("(foo", true));
         assert!(!is_highlightable(".foo", true));
         assert!(!is_highlightable(" foo", true));
     }
 
     #[test]
-    fn is_highlightable_trailing_nonword_char_fails_whole_word() {
+    fn is_highlightable_trailing_nonword_char_in_whole_word_mode_false() {
         assert!(!is_highlightable("foo(", true));
         assert!(!is_highlightable("foo.", true));
         assert!(!is_highlightable("foo ", true));
     }
 
     #[test]
-    fn is_highlightable_single_word_char_is_valid() {
+    fn is_highlightable_middle_nonword_char_always_true() {
+        assert!(is_highlightable("foo.bar", true));
+        assert!(is_highlightable("foo.bar", false));
+    }
+
+    #[test]
+    fn is_highlightable_single_word_char_true() {
         assert!(is_highlightable("x", true));
         assert!(is_highlightable("_", true));
         assert!(is_highlightable("1", true));
+    }
+
+    // TODO: The behavior of `is_highlightable` without whole-word mode with non-word characters is somewhat debatable.
+    // We should probably refine it if `whole_word` ever becomes user-configurable. Leave as-is for the time being.
+    #[test]
+    fn is_highlightable_any_nonempty_selection_without_whole_word_mode_true() {
+        assert!(is_highlightable(" ", false));
+        assert!(is_highlightable(".", false));
+        assert!(is_highlightable("()", false));
+        assert!(is_highlightable("foo bar", false));
     }
 
     // Test `compile_word_regex`.
@@ -1221,6 +1243,16 @@ mod tests {
     }
 
     #[test]
+    fn word_at_selection_middle_nonword_char_is_fine() {
+        // "let foo.bar = 1;" - select "foo.bar" at chars 4..11
+        let range = make_range(0, 4, 0, 11);
+        assert_eq!(
+            word_at("let foo.bar = 1;", range),
+            Some("foo.bar".to_owned())
+        );
+    }
+
+    #[test]
     fn word_at_cursor_in_middle_of_word() {
         // "hello world" - cursor on 'o' (char 4) -> word "hello".
         assert_eq!(
@@ -1250,6 +1282,15 @@ mod tests {
     }
 
     #[test]
+    fn word_at_cursor_on_word_with_underscores() {
+        // "some_var = 1;" - cursor on 'v' (char 5).
+        assert_eq!(
+            word_at("some_var = 1;", cursor_range(0, 5)),
+            Some("some_var".to_owned())
+        );
+    }
+
+    #[test]
     fn word_at_cursor_on_second_line() {
         let content = "first\nsecond line";
         // line 1, char 0 -> 's' in "second".
@@ -1262,15 +1303,6 @@ mod tests {
     #[test]
     fn word_at_nonexistent_line_is_none() {
         assert_eq!(word_at("one line only", cursor_range(99, 0)), None);
-    }
-
-    #[test]
-    fn word_at_word_with_underscores() {
-        // "some_var = 1;" - cursor on 'v' (char 5).
-        assert_eq!(
-            word_at("some_var = 1;", cursor_range(0, 5)),
-            Some("some_var".to_owned())
-        );
     }
 
     #[test]
@@ -1317,6 +1349,8 @@ mod integration {
 
     /// Stable document URI reused by all tests; the service is fresh per test so there's no cross-test state.
     const URI: &str = "file:///test.txt";
+
+    // Helper functions.
 
     /// Serialize `req` as a JSON-RPC request, drive it through the service, and return the serialized response.
     /// Notifications (no `id` field) produce `None`; requests produce `Some(response_json)`.
@@ -1484,6 +1518,8 @@ mod integration {
             .map(|c| (c[0], c[1], c[2], c[3]))
             .collect()
     }
+
+    // Tests.
 
     /// Baseline: no highlighted words -> no tokens emitted.
     #[tokio::test]
