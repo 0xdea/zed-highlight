@@ -14,9 +14,9 @@ const BINARY_NAME: &str = "zed-highlight-lsp";
 
 /// Zed extension that allows to highlight all occurrences of selected words.
 struct HighlightExtension {
-    /// In-process cache of the resolved binary path. Avoids a redundant `fs::metadata` call on every
-    /// `language_server_command` invocation within the same Zed session. Not persisted across restarts;
-    /// the versioned directory on disk serves that role.
+    /// In-process cache of the resolved binary path. Avoids a redundant [`fs::metadata`] call on every
+    /// [`zed::Extension::language_server_command`] invocation within the same Zed session. Not persisted across
+    /// restarts; the versioned directory on disk serves that role.
     cached_binary_path: Option<String>,
 }
 
@@ -64,10 +64,7 @@ impl HighlightExtension {
     ///
     /// ## Errors
     ///
-    /// Returns an error if:
-    /// - The latest release cannot be fetched from GitHub.
-    /// - No suitable prebuilt binary asset is found for the current platform.
-    /// - The binary fails to download, extract, or be made executable.
+    /// Returns an error if any step of the install process fails as reported by [`HighlightExtension::install_binary`].
     fn ensure_binary(&mut self, language_server_id: &LanguageServerId) -> Result<String> {
         // Immediately return the cached path if the file still exists on disk.
         if let Some(ref path) = self.cached_binary_path
@@ -76,20 +73,57 @@ impl HighlightExtension {
             return Ok(path.clone());
         }
 
+        // Run the install pipeline. On error, surface a `Failed` status to Zed before propagating so the UI doesn't
+        // get stuck on `CheckingForUpdate` or `Downloading`.
+        let result = Self::install_binary(language_server_id);
+
+        match result {
+            Ok(binary_path) => {
+                // Reset Zed language server installation status indicator and populate the cache.
+                zed::set_language_server_installation_status(
+                    language_server_id,
+                    &zed::LanguageServerInstallationStatus::None,
+                );
+                self.cached_binary_path = Some(binary_path.clone());
+                Ok(binary_path)
+            }
+            Err(e) => {
+                // Report failure to Zed so the UI can update accordingly.
+                zed::set_language_server_installation_status(
+                    language_server_id,
+                    &zed::LanguageServerInstallationStatus::Failed(e.clone()),
+                );
+                Err(e)
+            }
+        }
+    }
+
+    /// Perform the actual install steps (fetch release metadata, download and extract the latest release archive,
+    /// and make the binary executable). Errors bubble up to [`HighlightExtension::ensure_binary`], which is
+    /// responsible for reporting [`zed::LanguageServerInstallationStatus::Failed`] to the UI.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if:
+    /// - The latest release cannot be fetched from GitHub.
+    /// - No suitable prebuilt binary asset is found for the current platform.
+    /// - The binary fails to download, extract, or be made executable.
+    fn install_binary(language_server_id: &LanguageServerId) -> Result<String> {
         // Tell Zed we are checking for an update.
         zed::set_language_server_installation_status(
             language_server_id,
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
 
-        // Fetch the latest release from GitHub. Skip pre-releaases and tag-only releases with no attached binaries.
+        // Fetch the latest release from GitHub. Skip pre-releases and tag-only releases with no attached binaries.
         let release = zed::latest_github_release(
             REPOSITORY,
             zed::GithubReleaseOptions {
                 require_assets: true,
                 pre_release: false,
             },
-        )?;
+        )
+        .map_err(|e| format!("failed to fetch latest GitHub release: {e}"))?;
 
         // Determine which prebuilt asset to download for the current platform.
         let (os, arch) = zed::current_platform();
@@ -141,7 +175,8 @@ impl HighlightExtension {
             .map_err(|e| format!("failed to download {BINARY_NAME}: {e}"))?;
 
             // Ensure the binary is executable (this is a no-op on Windows or if the bit is already set).
-            zed::make_file_executable(&binary_path)?;
+            zed::make_file_executable(&binary_path)
+                .map_err(|e| format!("failed to make {BINARY_NAME} executable: {e}"))?;
 
             // Remove all other directories to avoid unbounded disk growth.
             #[expect(
@@ -157,14 +192,6 @@ impl HighlightExtension {
             }
         }
 
-        // Reset Zed language server installation status indicator.
-        zed::set_language_server_installation_status(
-            language_server_id,
-            &zed::LanguageServerInstallationStatus::None,
-        );
-
-        // Populate the cache and return the binary path.
-        self.cached_binary_path = Some(binary_path.clone());
         Ok(binary_path)
     }
 }
