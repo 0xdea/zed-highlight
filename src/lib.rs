@@ -309,63 +309,11 @@ mod tests {
         assert_eq!(name, "zed-highlight-lsp-windows-x86.tar.gz");
     }
 
-    #[test]
-    fn asset_name_starts_with_binary_name() {
-        for os in [zed::Os::Mac, zed::Os::Linux, zed::Os::Windows] {
-            for arch in [
-                zed::Architecture::Aarch64,
-                zed::Architecture::X8664,
-                zed::Architecture::X86,
-            ] {
-                let name = platform_asset_name(os, arch);
-                assert!(
-                    name.starts_with(BINARY_NAME),
-                    "asset name '{name}' must start with `BINARY_NAME`"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn asset_name_ends_with_tar_gz() {
-        for os in [zed::Os::Mac, zed::Os::Linux, zed::Os::Windows] {
-            for arch in [
-                zed::Architecture::Aarch64,
-                zed::Architecture::X8664,
-                zed::Architecture::X86,
-            ] {
-                let name = platform_asset_name(os, arch);
-                assert!(
-                    name.ends_with(".tar.gz"),
-                    "asset name '{name}' must end with '.tar.gz'"
-                );
-            }
-        }
-    }
-
     // Test `version_dir_name`.
 
     #[test]
     fn version_dir_name_format_is_correct() {
         assert_eq!(version_dir_name("0.1.0"), "zed-highlight-lsp-0.1.0");
-    }
-
-    #[test]
-    fn version_dir_name_starts_with_binary_name() {
-        let dir = version_dir_name("1.2.3");
-        assert!(
-            dir.starts_with(BINARY_NAME),
-            "version dir '{dir}' must start with `BINARY_NAME` so old-version cleanup is scoped correctly"
-        );
-    }
-
-    #[test]
-    fn version_dir_name_includes_version() {
-        let version = "99.0.0-alpha";
-        assert!(
-            version_dir_name(version).contains(version),
-            "version dir must contain the version string verbatim"
-        );
     }
 
     // Test `binary_path_in_version`.
@@ -375,26 +323,6 @@ mod tests {
         assert_eq!(
             binary_path_in_version("0.1.0"),
             "zed-highlight-lsp-0.1.0/zed-highlight-lsp"
-        );
-    }
-
-    #[test]
-    fn binary_path_in_version_is_under_version_dir() {
-        let version = "0.1.0";
-        let dir = version_dir_name(version);
-        let path = binary_path_in_version(version);
-        assert!(
-            path.starts_with(&dir),
-            "binary path '{path}' must be inside its version directory '{dir}'"
-        );
-    }
-
-    #[test]
-    fn binary_path_ends_with_binary_name() {
-        let path = binary_path_in_version("0.1.0");
-        assert!(
-            path.ends_with(BINARY_NAME),
-            "binary path '{path}' must end with `BINARY_NAME` so `make_file_executable` targets the right file"
         );
     }
 

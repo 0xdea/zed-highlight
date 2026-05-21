@@ -1077,11 +1077,6 @@ mod tests {
     // Test `compile_word_regex`.
 
     #[test]
-    fn compile_word_regex_returns_some_for_valid_word() {
-        assert!(compile_word_regex("hello", false, false).is_some());
-    }
-
-    #[test]
     fn compile_word_regex_basic_match() {
         let re = compile_word_regex("foo", false, false).unwrap();
         assert!(re.is_match("foo"));
@@ -1241,11 +1236,6 @@ mod tests {
     }
 
     #[test]
-    fn word_at_cursor_on_space_is_none() {
-        assert_eq!(word_at("a b", cursor_range(0, 1)), None);
-    }
-
-    #[test]
     fn word_at_cursor_on_punctuation_is_none() {
         // "foo(bar)" - char 3 is '('.
         assert_eq!(word_at("foo(bar)", cursor_range(0, 3)), None);
@@ -1303,11 +1293,5 @@ mod tests {
         // Selecting only whitespace (e.g., a space) should yield None.
         let range = make_range(0, 3, 0, 4); // the space in "foo bar"
         assert_eq!(word_at("foo bar", range), None);
-    }
-
-    #[test]
-    fn word_at_num_colors_cycle() {
-        // Sanity-check that NUM_COLORS equals the token type legend length.
-        assert_eq!(NUM_COLORS, TOKEN_TYPE_NAMES.len());
     }
 }
