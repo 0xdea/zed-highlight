@@ -970,16 +970,16 @@ mod tests {
     #[test]
     fn utf16_to_byte_bmp_multibyte_char() {
         // "£a": '£' occupies 1 UTF-16 unit but 2 UTF-8 bytes.
-        // UTF-16 offset 1 → byte offset 2.
+        // UTF-16 offset 1 -> byte offset 2.
         assert_eq!(utf16_to_byte("£a", 1), Some(2));
-        // UTF-16 offset 2 → byte offset 3 (end of string).
+        // UTF-16 offset 2 -> byte offset 3 (end of string).
         assert_eq!(utf16_to_byte("£a", 2), Some(3));
     }
 
     #[test]
     fn utf16_to_byte_surrogate_pair() {
         // "😀a": '😀' occupies 2 UTF-16 units but 4 UTF-8 bytes.
-        // UTF-16 offset 2 → byte offset 4.
+        // UTF-16 offset 2 -> byte offset 4.
         assert_eq!(utf16_to_byte("😀a", 2), Some(4));
     }
 
@@ -1205,21 +1205,21 @@ mod tests {
 
     #[test]
     fn word_at_selection_returns_selected_text() {
-        // "let foo = 1;" — select "foo" at UTF-16 chars 4..7.
+        // "let foo = 1;" - select "foo" at UTF-16 chars 4..7.
         let range = make_range(0, 4, 0, 7);
         assert_eq!(word_at("let foo = 1;", range), Some("foo".to_owned()));
     }
 
     #[test]
     fn word_at_selection_trims_surrounding_whitespace() {
-        // "let foo = 1;" — select " foo " at chars 3..8.
+        // "let foo = 1;" - select " foo " at chars 3..8.
         let range = make_range(0, 3, 0, 8);
         assert_eq!(word_at("let foo = 1;", range), Some("foo".to_owned()));
     }
 
     #[test]
     fn word_at_cursor_in_middle_of_word() {
-        // "hello world" — cursor on 'o' (char 4) → word "hello".
+        // "hello world" - cursor on 'o' (char 4) -> word "hello".
         assert_eq!(
             word_at("hello world", cursor_range(0, 4)),
             Some("hello".to_owned())
@@ -1247,14 +1247,14 @@ mod tests {
 
     #[test]
     fn word_at_cursor_on_punctuation_is_none() {
-        // "foo(bar)" — char 3 is '('.
+        // "foo(bar)" - char 3 is '('.
         assert_eq!(word_at("foo(bar)", cursor_range(0, 3)), None);
     }
 
     #[test]
     fn word_at_cursor_on_second_line() {
         let content = "first\nsecond line";
-        // line 1, char 0 → 's' in "second".
+        // line 1, char 0 -> 's' in "second".
         assert_eq!(
             word_at(content, cursor_range(1, 0)),
             Some("second".to_owned())
@@ -1268,7 +1268,7 @@ mod tests {
 
     #[test]
     fn word_at_word_with_underscores() {
-        // "some_var = 1;" — cursor on 'v' (char 5).
+        // "some_var = 1;" - cursor on 'v' (char 5).
         assert_eq!(
             word_at("some_var = 1;", cursor_range(0, 5)),
             Some("some_var".to_owned())
@@ -1286,7 +1286,7 @@ mod tests {
 
     #[test]
     fn word_at_selection_with_bmp_multibyte_chars() {
-        // "中文 hello" — '中' and '文' are each 1 UTF-16 unit (3 UTF-8 bytes).
+        // "中文 hello" - '中' and '文' are each 1 UTF-16 unit (3 UTF-8 bytes).
         // "hello" starts at UTF-16 offset 3, ends at offset 8.
         let range = make_range(0, 3, 0, 8);
         assert_eq!(word_at("中文 hello", range), Some("hello".to_owned()));
@@ -1294,7 +1294,7 @@ mod tests {
 
     #[test]
     fn word_at_cursor_after_surrogate_pair() {
-        // "😀foo" — emoji is 2 UTF-16 units; 'f' starts at UTF-16 offset 2.
+        // "😀foo" - emoji is 2 UTF-16 units; 'f' starts at UTF-16 offset 2.
         assert_eq!(word_at("😀foo", cursor_range(0, 2)), Some("foo".to_owned()));
     }
 

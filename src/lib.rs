@@ -320,7 +320,7 @@ mod tests {
                 let name = platform_asset_name(os, arch);
                 assert!(
                     name.starts_with(BINARY_NAME),
-                    "asset name '{name}' must start with BINARY_NAME"
+                    "asset name '{name}' must start with `BINARY_NAME`"
                 );
             }
         }
@@ -337,7 +337,7 @@ mod tests {
                 let name = platform_asset_name(os, arch);
                 assert!(
                     name.ends_with(".tar.gz"),
-                    "asset name '{name}' must end with .tar.gz"
+                    "asset name '{name}' must end with '.tar.gz'"
                 );
             }
         }
@@ -355,7 +355,7 @@ mod tests {
         let dir = version_dir_name("1.2.3");
         assert!(
             dir.starts_with(BINARY_NAME),
-            "version dir '{dir}' must start with BINARY_NAME so old-version cleanup is scoped correctly"
+            "version dir '{dir}' must start with `BINARY_NAME` so old-version cleanup is scoped correctly"
         );
     }
 
@@ -394,7 +394,7 @@ mod tests {
         let path = binary_path_in_version("0.1.0");
         assert!(
             path.ends_with(BINARY_NAME),
-            "binary path '{path}' must end with BINARY_NAME so `make_file_executable` targets the right file"
+            "binary path '{path}' must end with `BINARY_NAME` so `make_file_executable` targets the right file"
         );
     }
 
