@@ -984,6 +984,13 @@ mod tests {
     }
 
     #[test]
+    fn utf16_to_byte_inside_surrogate_pair_is_none() {
+        // "😀a": '😀' occupies 2 UTF-16 units but 4 UTF-8 bytes.
+        // UTF-16 offset 1 -> lands inside the surrogate pair.
+        assert_eq!(utf16_to_byte("😀a", 1), None);
+    }
+
+    #[test]
     fn utf16_to_byte_empty_string_offset_zero() {
         assert_eq!(utf16_to_byte("", 0), Some(0));
     }
