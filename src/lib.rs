@@ -127,25 +127,13 @@ impl HighlightExtension {
 
         // Determine which prebuilt asset to download for the current platform.
         let (os, arch) = zed::current_platform();
-        let asset_name = format!(
-            "{BINARY_NAME}-{os}-{arch}.tar.gz",
-            os = match os {
-                zed::Os::Mac => "darwin",
-                zed::Os::Linux => "linux",
-                zed::Os::Windows => "windows",
-            },
-            arch = match arch {
-                zed::Architecture::Aarch64 => "aarch64",
-                zed::Architecture::X8664 => "x86_64",
-                zed::Architecture::X86 => "x86", // Not supported by Zed.
-            },
-        );
+        let asset_name = platform_asset_name(os, arch);
 
         // The versioned directory name encodes the release tag so that:
         // - A cached binary from the current version is reused without re-downloading.
         // - Upgrading to a new release stores the new binary in a different directory and cleans up the old ones.
-        let version_dir = format!("{BINARY_NAME}-{}", release.version);
-        let binary_path = format!("{version_dir}/{BINARY_NAME}");
+        let version_dir = version_dir_name(&release.version);
+        let binary_path = binary_path_in_version(&release.version);
 
         // Download and extract the binary if it's not already present.
         if !fs::metadata(&binary_path).is_ok_and(|m| m.is_file()) {
@@ -196,6 +184,34 @@ impl HighlightExtension {
     }
 }
 
+/// Helper function to return the tarball asset name for the given OS and architecture.
+///
+/// Asset names follow the pattern `{BINARY_NAME}-{os}-{arch}.tar.gz` and are
+/// matched against GitHub Release asset names during installation.
+fn platform_asset_name(os: zed::Os, arch: zed::Architecture) -> String {
+    let os = match os {
+        zed::Os::Mac => "darwin",
+        zed::Os::Linux => "linux",
+        zed::Os::Windows => "windows",
+    };
+    let arch = match arch {
+        zed::Architecture::Aarch64 => "aarch64",
+        zed::Architecture::X8664 => "x86_64",
+        zed::Architecture::X86 => "x86", // Not supported by Zed.
+    };
+    format!("{BINARY_NAME}-{os}-{arch}.tar.gz")
+}
+
+/// Helper function to return the versioned directory name used to cache a specific release on disk.
+fn version_dir_name(version: &str) -> String {
+    format!("{BINARY_NAME}-{version}")
+}
+
+/// Helper function to return the path to the binary within its versioned directory.
+fn binary_path_in_version(version: &str) -> String {
+    format!("{}/{BINARY_NAME}", version_dir_name(version))
+}
+
 /// Register as a Zed extension.
 mod register {
     // The `register_extension!` macro expands to `pub` glue items that the WASM host imports by name.
@@ -203,22 +219,194 @@ mod register {
     super::zed::register_extension!(super::HighlightExtension);
 }
 
-// TODO: add tests.
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
 
     // Test constants.
-    const EXPECTED_SUM: i32 = 4;
-    const EXPECTED_RESULT: &str = "Expected result string";
 
     #[test]
-    fn it_works() {
-        // Arrange.
-        // Act.
-        // Assert.
-        assert_eq!(2 + 2, EXPECTED_SUM, "It should work!");
+    fn binary_name_is_correct() {
+        assert_eq!(
+            BINARY_NAME, "zed-highlight-lsp",
+            "language server binary name must match the published crate"
+        );
+    }
+
+    #[test]
+    fn repository_slug_is_correct() {
+        assert_eq!(
+            REPOSITORY, "0xdea/zed-highlight",
+            "repository must be the canonical GitHub slug"
+        );
+    }
+
+    // Test `HighlightExtension::new`.
+
+    #[test]
+    fn new_starts_with_no_cached_path() {
+        // Call `new` through the `zed::Extension` trait.
+        let ext = <HighlightExtension as zed::Extension>::new();
+        assert!(
+            ext.cached_binary_path.is_none(),
+            "a freshly created extension must not have a cached binary path"
+        );
+    }
+
+    // Test `platform_asset_name`.
+
+    #[test]
+    fn asset_name_mac_aarch64_is_correct() {
+        let name = platform_asset_name(zed::Os::Mac, zed::Architecture::Aarch64);
+        assert_eq!(name, "zed-highlight-lsp-darwin-aarch64.tar.gz");
+    }
+
+    #[test]
+    fn asset_name_mac_x86_64_is_correct() {
+        let name = platform_asset_name(zed::Os::Mac, zed::Architecture::X8664);
+        assert_eq!(name, "zed-highlight-lsp-darwin-x86_64.tar.gz");
+    }
+
+    #[test]
+    fn asset_name_mac_x86_is_correct() {
+        let name = platform_asset_name(zed::Os::Mac, zed::Architecture::X86);
+        assert_eq!(name, "zed-highlight-lsp-darwin-x86.tar.gz");
+    }
+
+    #[test]
+    fn asset_name_linux_aarch64_is_correct() {
+        let name = platform_asset_name(zed::Os::Linux, zed::Architecture::Aarch64);
+        assert_eq!(name, "zed-highlight-lsp-linux-aarch64.tar.gz");
+    }
+
+    #[test]
+    fn asset_name_linux_x86_64_is_correct() {
+        let name = platform_asset_name(zed::Os::Linux, zed::Architecture::X8664);
+        assert_eq!(name, "zed-highlight-lsp-linux-x86_64.tar.gz");
+    }
+
+    #[test]
+    fn asset_name_linux_x86_is_correct() {
+        let name = platform_asset_name(zed::Os::Linux, zed::Architecture::X86);
+        assert_eq!(name, "zed-highlight-lsp-linux-x86.tar.gz");
+    }
+
+    #[test]
+    fn asset_name_windows_aarch64_is_correct() {
+        let name = platform_asset_name(zed::Os::Windows, zed::Architecture::Aarch64);
+        assert_eq!(name, "zed-highlight-lsp-windows-aarch64.tar.gz");
+    }
+
+    #[test]
+    fn asset_name_windows_x86_64_is_correct() {
+        let name = platform_asset_name(zed::Os::Windows, zed::Architecture::X8664);
+        assert_eq!(name, "zed-highlight-lsp-windows-x86_64.tar.gz");
+    }
+
+    #[test]
+    fn asset_name_windows_x86_is_correct() {
+        let name = platform_asset_name(zed::Os::Windows, zed::Architecture::X86);
+        assert_eq!(name, "zed-highlight-lsp-windows-x86.tar.gz");
+    }
+
+    #[test]
+    fn asset_name_starts_with_binary_name() {
+        for os in [zed::Os::Mac, zed::Os::Linux, zed::Os::Windows] {
+            for arch in [
+                zed::Architecture::Aarch64,
+                zed::Architecture::X8664,
+                zed::Architecture::X86,
+            ] {
+                let name = platform_asset_name(os, arch);
+                assert!(
+                    name.starts_with(BINARY_NAME),
+                    "asset name '{name}' must start with BINARY_NAME"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn asset_name_ends_with_tar_gz() {
+        for os in [zed::Os::Mac, zed::Os::Linux, zed::Os::Windows] {
+            for arch in [
+                zed::Architecture::Aarch64,
+                zed::Architecture::X8664,
+                zed::Architecture::X86,
+            ] {
+                let name = platform_asset_name(os, arch);
+                assert!(
+                    name.ends_with(".tar.gz"),
+                    "asset name '{name}' must end with .tar.gz"
+                );
+            }
+        }
+    }
+
+    // Test `version_dir_name`.
+
+    #[test]
+    fn version_dir_name_format_is_correct() {
+        assert_eq!(version_dir_name("0.1.0"), "zed-highlight-lsp-0.1.0");
+    }
+
+    #[test]
+    fn version_dir_name_starts_with_binary_name() {
+        let dir = version_dir_name("1.2.3");
+        assert!(
+            dir.starts_with(BINARY_NAME),
+            "version dir '{dir}' must start with BINARY_NAME so old-version cleanup is scoped correctly"
+        );
+    }
+
+    #[test]
+    fn version_dir_name_includes_version() {
+        let version = "99.0.0-alpha";
+        assert!(
+            version_dir_name(version).contains(version),
+            "version dir must contain the version string verbatim"
+        );
+    }
+
+    // Test `binary_path_in_version`.
+
+    #[test]
+    fn binary_path_in_version_format_is_correct() {
+        assert_eq!(
+            binary_path_in_version("0.1.0"),
+            "zed-highlight-lsp-0.1.0/zed-highlight-lsp"
+        );
+    }
+
+    #[test]
+    fn binary_path_in_version_is_under_version_dir() {
+        let version = "0.1.0";
+        let dir = version_dir_name(version);
+        let path = binary_path_in_version(version);
+        assert!(
+            path.starts_with(&dir),
+            "binary path '{path}' must be inside its version directory '{dir}'"
+        );
+    }
+
+    #[test]
+    fn binary_path_ends_with_binary_name() {
+        let path = binary_path_in_version("0.1.0");
+        assert!(
+            path.ends_with(BINARY_NAME),
+            "binary path '{path}' must end with BINARY_NAME so `make_file_executable` targets the right file"
+        );
+    }
+
+    #[test]
+    fn binary_path_uses_forward_slash() {
+        // The path is passed to `zed::make_file_executable` and `zed::download_file`, both of which expect POSIX-style
+        // paths because the extension runs inside a WASM sandbox.
+        let path = binary_path_in_version("0.1.0");
+        assert!(path.contains('/'), "binary path must use '/' as separator");
+        assert!(
+            !path.contains('\\'),
+            "binary path must not use '\\' as separator"
+        );
     }
 }
-*/

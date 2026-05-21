@@ -703,3 +703,611 @@ async fn main() {
     let (service, socket) = LspService::new(Backend::new);
     Server::new(stdin, stdout, socket).serve(service).await;
 }
+
+#[expect(clippy::unwrap_used, reason = "tests can use `unwrap`")]
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helper functions.
+
+    fn make_range(sl: u32, sc: u32, el: u32, ec: u32) -> Range {
+        Range {
+            start: Position {
+                line: sl,
+                character: sc,
+            },
+            end: Position {
+                line: el,
+                character: ec,
+            },
+        }
+    }
+
+    fn cursor_range(line: u32, character: u32) -> Range {
+        make_range(line, character, line, character)
+    }
+
+    // Test `State::new`.
+
+    #[test]
+    fn state_new_has_empty_word_list() {
+        let s = State::new();
+        assert!(s.words.is_empty());
+    }
+
+    #[test]
+    fn state_new_has_empty_docs() {
+        let s = State::new();
+        assert!(s.docs.is_empty());
+    }
+
+    #[test]
+    fn state_new_defaults_whole_word_true() {
+        let s = State::new();
+        assert!(s.whole_word);
+    }
+
+    #[test]
+    fn state_new_defaults_ignore_case_false() {
+        let s = State::new();
+        assert!(!s.ignore_case);
+    }
+
+    // Test `State::toggle`.
+
+    #[test]
+    fn state_toggle_adds_new_word() {
+        let mut s = State::new();
+        s.toggle("foo");
+        assert_eq!(s.words, vec![Some("foo".to_owned())]);
+    }
+
+    #[test]
+    fn state_toggle_removes_existing_word_leaving_none_slot() {
+        let mut s = State::new();
+        s.toggle("foo");
+        s.toggle("foo");
+        assert_eq!(s.words, vec![None]);
+    }
+
+    #[test]
+    fn state_toggle_reuses_first_none_slot_for_new_word() {
+        let mut s = State::new();
+        s.toggle("foo"); // slot 0 = Some("foo")
+        s.toggle("foo"); // slot 0 = None
+        s.toggle("bar"); // should reuse slot 0, not grow
+        assert_eq!(s.words, vec![Some("bar".to_owned())]);
+    }
+
+    #[test]
+    fn state_toggle_grows_list_when_no_free_slots() {
+        let mut s = State::new();
+        s.toggle("a");
+        s.toggle("b");
+        assert_eq!(s.words.len(), 2);
+        assert!(s.words.iter().all(Option::is_some));
+    }
+
+    #[test]
+    fn state_toggle_leaves_other_words_in_place_after_removal() {
+        let mut s = State::new();
+        s.toggle("a");
+        s.toggle("b");
+        s.toggle("a"); // soft-delete "a"
+        assert!(s.words[0].is_none(), "removed slot must be `None`");
+        assert_eq!(s.words[1], Some("b".to_owned()));
+    }
+
+    #[test]
+    fn state_toggle_respects_ignore_case_for_deduplication() {
+        let mut s = State::new();
+        s.ignore_case = true;
+        s.toggle("Foo");
+        s.toggle("foo"); // should match "Foo" and remove it
+        assert!(!s.is_highlighted("foo"));
+        assert!(!s.is_highlighted("Foo"));
+    }
+
+    // Test `State::has_any`.
+
+    #[test]
+    fn state_has_any_false_when_empty() {
+        assert!(!State::new().has_any());
+    }
+
+    #[test]
+    fn state_has_any_false_when_all_slots_are_none() {
+        let mut s = State::new();
+        s.toggle("a");
+        s.toggle("a");
+        assert!(!s.has_any());
+    }
+
+    #[test]
+    fn state_has_any_true_when_at_least_one_word_present() {
+        let mut s = State::new();
+        s.toggle("a");
+        assert!(s.has_any());
+    }
+
+    #[test]
+    fn state_has_any_true_with_mixed_none_and_some() {
+        let mut s = State::new();
+        s.toggle("a");
+        s.toggle("b");
+        s.toggle("a"); // remove "a", keep "b"
+        assert!(s.has_any());
+    }
+
+    // Test `State::is_highlighted`.
+
+    #[test]
+    fn state_is_highlighted_true_for_present_word() {
+        let mut s = State::new();
+        s.toggle("foo");
+        assert!(s.is_highlighted("foo"));
+    }
+
+    #[test]
+    fn state_is_highlighted_false_for_absent_word() {
+        let mut s = State::new();
+        s.toggle("foo");
+        assert!(!s.is_highlighted("bar"));
+    }
+
+    #[test]
+    fn state_is_highlighted_false_after_removal() {
+        let mut s = State::new();
+        s.toggle("foo");
+        s.toggle("foo");
+        assert!(!s.is_highlighted("foo"));
+    }
+
+    // Test `State::words_clear`.
+
+    #[test]
+    fn state_words_clear_empties_list() {
+        let mut s = State::new();
+        s.toggle("a");
+        s.toggle("b");
+        s.words_clear();
+        assert!(s.words.is_empty());
+    }
+
+    #[test]
+    fn state_words_clear_results_in_has_any_false() {
+        let mut s = State::new();
+        s.toggle("a");
+        s.words_clear();
+        assert!(!s.has_any());
+    }
+
+    // Test `State::words_eq`.
+
+    #[test]
+    fn state_words_eq_identical_strings() {
+        let s = State::new();
+        assert!(s.words_eq("hello", "hello"));
+    }
+
+    #[test]
+    fn state_words_eq_case_sensitive_by_default() {
+        let s = State::new();
+        assert!(!s.words_eq("Foo", "foo"));
+    }
+
+    #[test]
+    fn state_words_eq_case_insensitive_when_flag_set() {
+        let mut s = State::new();
+        s.ignore_case = true;
+        assert!(s.words_eq("Foo", "foo"));
+        assert!(s.words_eq("FOO", "foo"));
+    }
+
+    #[test]
+    fn state_words_eq_different_words_always_false() {
+        let mut s = State::new();
+        assert!(!s.words_eq("foo", "bar"));
+        s.ignore_case = true;
+        assert!(!s.words_eq("foo", "bar"));
+    }
+
+    // Test `utf16_len`.
+
+    #[test]
+    fn utf16_len_empty_string_is_zero() {
+        assert_eq!(utf16_len(""), 0);
+    }
+
+    #[test]
+    fn utf16_len_ascii_counts_one_per_char() {
+        assert_eq!(utf16_len("hello"), 5);
+    }
+
+    #[test]
+    fn utf16_len_bmp_multibyte_char_counts_one() {
+        // '£' is U+00A3: 2 UTF-8 bytes, 1 UTF-16 code unit.
+        assert_eq!(utf16_len("£"), 1);
+        // '中' is U+4E2D: 3 UTF-8 bytes, 1 UTF-16 code unit.
+        assert_eq!(utf16_len("中文"), 2);
+    }
+
+    #[test]
+    fn utf16_len_supplementary_char_counts_two() {
+        // '😀' is U+1F600: 4 UTF-8 bytes, 2 UTF-16 code units (surrogate pair).
+        assert_eq!(utf16_len("😀"), 2);
+    }
+
+    #[test]
+    fn utf16_len_mixed_content() {
+        // "a😀b" = 1 + 2 + 1 = 4 UTF-16 code units.
+        assert_eq!(utf16_len("a😀b"), 4);
+    }
+
+    // Test `utf16_to_byte`.
+
+    #[test]
+    fn utf16_to_byte_offset_zero_is_string_start() {
+        assert_eq!(utf16_to_byte("hello", 0), Some(0));
+    }
+
+    #[test]
+    fn utf16_to_byte_ascii_offsets_equal_byte_offsets() {
+        assert_eq!(utf16_to_byte("hello", 3), Some(3));
+    }
+
+    #[test]
+    fn utf16_to_byte_offset_at_end_of_string() {
+        assert_eq!(utf16_to_byte("hello", 5), Some(5));
+    }
+
+    #[test]
+    fn utf16_to_byte_offset_past_end_returns_none() {
+        assert_eq!(utf16_to_byte("hello", 6), None);
+    }
+
+    #[test]
+    fn utf16_to_byte_bmp_multibyte_char() {
+        // "£a": '£' occupies 1 UTF-16 unit but 2 UTF-8 bytes.
+        // UTF-16 offset 1 → byte offset 2.
+        assert_eq!(utf16_to_byte("£a", 1), Some(2));
+        // UTF-16 offset 2 → byte offset 3 (end of string).
+        assert_eq!(utf16_to_byte("£a", 2), Some(3));
+    }
+
+    #[test]
+    fn utf16_to_byte_surrogate_pair() {
+        // "😀a": '😀' occupies 2 UTF-16 units but 4 UTF-8 bytes.
+        // UTF-16 offset 2 → byte offset 4.
+        assert_eq!(utf16_to_byte("😀a", 2), Some(4));
+    }
+
+    #[test]
+    fn utf16_to_byte_empty_string_offset_zero() {
+        assert_eq!(utf16_to_byte("", 0), Some(0));
+    }
+
+    #[test]
+    fn utf16_to_byte_empty_string_nonzero_is_none() {
+        assert_eq!(utf16_to_byte("", 1), None);
+    }
+
+    // Test `is_word_char`.
+
+    #[test]
+    fn is_word_char_ascii_letters() {
+        assert!(is_word_char('a'));
+        assert!(is_word_char('z'));
+        assert!(is_word_char('A'));
+        assert!(is_word_char('Z'));
+    }
+
+    #[test]
+    fn is_word_char_digits() {
+        assert!(is_word_char('0'));
+        assert!(is_word_char('9'));
+    }
+
+    #[test]
+    fn is_word_char_underscore() {
+        assert!(is_word_char('_'));
+    }
+
+    #[test]
+    fn is_word_char_space_is_false() {
+        assert!(!is_word_char(' '));
+        assert!(!is_word_char('\t'));
+        assert!(!is_word_char('\n'));
+    }
+
+    #[test]
+    fn is_word_char_punctuation_is_false() {
+        for c in [
+            '.', ',', '!', '(', ')', '-', '+', '=', '*', '/', '\\', '"', '\'', ';', ':',
+        ] {
+            assert!(!is_word_char(c), "'{c}' should not be a word char");
+        }
+    }
+
+    // Test `is_highlightable`.
+
+    #[test]
+    fn is_highlightable_empty_string_always_false() {
+        assert!(!is_highlightable("", false));
+        assert!(!is_highlightable("", true));
+    }
+
+    #[test]
+    fn is_highlightable_any_nonempty_without_whole_word() {
+        assert!(is_highlightable("foo", false));
+        assert!(is_highlightable("(bar)", false));
+        assert!(is_highlightable("foo bar", false));
+    }
+
+    #[test]
+    fn is_highlightable_identifier_in_whole_word_mode() {
+        assert!(is_highlightable("foo", true));
+        assert!(is_highlightable("foo_bar", true));
+        assert!(is_highlightable("foo123", true));
+        assert!(is_highlightable("_private", true));
+    }
+
+    #[test]
+    fn is_highlightable_leading_nonword_char_fails_whole_word() {
+        assert!(!is_highlightable("(foo", true));
+        assert!(!is_highlightable(".foo", true));
+        assert!(!is_highlightable(" foo", true));
+    }
+
+    #[test]
+    fn is_highlightable_trailing_nonword_char_fails_whole_word() {
+        assert!(!is_highlightable("foo(", true));
+        assert!(!is_highlightable("foo.", true));
+        assert!(!is_highlightable("foo ", true));
+    }
+
+    #[test]
+    fn is_highlightable_single_word_char_is_valid() {
+        assert!(is_highlightable("x", true));
+        assert!(is_highlightable("_", true));
+        assert!(is_highlightable("1", true));
+    }
+
+    // Test `compile_word_regex`.
+
+    #[test]
+    fn compile_word_regex_returns_some_for_valid_word() {
+        assert!(compile_word_regex("hello", false, false).is_some());
+    }
+
+    #[test]
+    fn compile_word_regex_basic_match() {
+        let re = compile_word_regex("foo", false, false).unwrap();
+        assert!(re.is_match("foo"));
+    }
+
+    #[test]
+    fn compile_word_regex_matches_substring_without_whole_word() {
+        let re = compile_word_regex("for", false, false).unwrap();
+        assert!(re.is_match("format"));
+    }
+
+    #[test]
+    fn compile_word_regex_whole_word_rejects_substring() {
+        let re = compile_word_regex("for", true, false).unwrap();
+        assert!(
+            !re.is_match("format"),
+            "whole-word 'for' must not match inside 'format'"
+        );
+        assert!(
+            !re.is_match("therefore"),
+            "whole-word 'for' must not match inside 'therefore'"
+        );
+    }
+
+    #[test]
+    fn compile_word_regex_whole_word_matches_standalone() {
+        let re = compile_word_regex("for", true, false).unwrap();
+        assert!(re.is_match("for x in y"));
+        assert!(re.is_match("(for)"));
+    }
+
+    #[test]
+    fn compile_word_regex_case_sensitive_by_default() {
+        let re = compile_word_regex("Foo", false, false).unwrap();
+        assert!(re.is_match("Foo"));
+        assert!(!re.is_match("foo"));
+        assert!(!re.is_match("FOO"));
+    }
+
+    #[test]
+    fn compile_word_regex_case_insensitive_flag() {
+        let re = compile_word_regex("Foo", false, true).unwrap();
+        assert!(re.is_match("Foo"));
+        assert!(re.is_match("foo"));
+        assert!(re.is_match("FOO"));
+    }
+
+    #[test]
+    fn compile_word_regex_escapes_dot_as_literal() {
+        let re = compile_word_regex("foo.bar", false, false).unwrap();
+        assert!(re.is_match("foo.bar"));
+        assert!(
+            !re.is_match("fooXbar"),
+            "dot must match literally, not as any-char"
+        );
+    }
+
+    #[test]
+    fn compile_word_regex_escapes_parentheses() {
+        let re = compile_word_regex("foo()", false, false).unwrap();
+        assert!(re.is_match("foo()"));
+        assert!(!re.is_match("foo"), "parentheses are not optional");
+    }
+
+    #[test]
+    fn compile_word_regex_escapes_star() {
+        let re = compile_word_regex("a*b", false, false).unwrap();
+        assert!(re.is_match("a*b"));
+        assert!(!re.is_match("ab"), "star must be literal, not a quantifier");
+    }
+
+    // Test `matches_anywhere`.
+
+    #[test]
+    fn matches_anywhere_finds_word_in_content() {
+        assert!(matches_anywhere("let foo = 1;", "foo", true, false));
+    }
+
+    #[test]
+    fn matches_anywhere_returns_false_for_absent_word() {
+        assert!(!matches_anywhere("let foo = 1;", "bar", true, false));
+    }
+
+    #[test]
+    fn matches_anywhere_whole_word_rejects_substring() {
+        assert!(!matches_anywhere("format!()", "for", true, false));
+    }
+
+    #[test]
+    fn matches_anywhere_non_whole_word_finds_substring() {
+        assert!(matches_anywhere("format!()", "for", false, false));
+    }
+
+    #[test]
+    fn matches_anywhere_case_insensitive_finds_match() {
+        assert!(matches_anywhere("let Foo = 1;", "foo", false, true));
+    }
+
+    #[test]
+    fn matches_anywhere_multiline_content_any_line() {
+        let content = "line one\nfoo here\nline three";
+        assert!(matches_anywhere(content, "foo", true, false));
+    }
+
+    #[test]
+    fn matches_anywhere_empty_content_returns_false() {
+        assert!(!matches_anywhere("", "foo", true, false));
+    }
+
+    #[test]
+    fn matches_anywhere_word_not_on_this_line_returns_false() {
+        assert!(!matches_anywhere(
+            "line one\nline two",
+            "three",
+            true,
+            false
+        ));
+    }
+
+    // Test `word_at`.
+
+    #[test]
+    fn word_at_selection_returns_selected_text() {
+        // "let foo = 1;" — select "foo" at UTF-16 chars 4..7.
+        let range = make_range(0, 4, 0, 7);
+        assert_eq!(word_at("let foo = 1;", range), Some("foo".to_owned()));
+    }
+
+    #[test]
+    fn word_at_selection_trims_surrounding_whitespace() {
+        // "let foo = 1;" — select " foo " at chars 3..8.
+        let range = make_range(0, 3, 0, 8);
+        assert_eq!(word_at("let foo = 1;", range), Some("foo".to_owned()));
+    }
+
+    #[test]
+    fn word_at_cursor_in_middle_of_word() {
+        // "hello world" — cursor on 'o' (char 4) → word "hello".
+        assert_eq!(
+            word_at("hello world", cursor_range(0, 4)),
+            Some("hello".to_owned())
+        );
+    }
+
+    #[test]
+    fn word_at_cursor_at_start_of_word() {
+        assert_eq!(
+            word_at("hello world", cursor_range(0, 0)),
+            Some("hello".to_owned())
+        );
+    }
+
+    #[test]
+    fn word_at_cursor_just_past_word_end_is_none() {
+        // char 5 in "hello world" is the space between the words.
+        assert_eq!(word_at("hello world", cursor_range(0, 5)), None);
+    }
+
+    #[test]
+    fn word_at_cursor_on_space_is_none() {
+        assert_eq!(word_at("a b", cursor_range(0, 1)), None);
+    }
+
+    #[test]
+    fn word_at_cursor_on_punctuation_is_none() {
+        // "foo(bar)" — char 3 is '('.
+        assert_eq!(word_at("foo(bar)", cursor_range(0, 3)), None);
+    }
+
+    #[test]
+    fn word_at_cursor_on_second_line() {
+        let content = "first\nsecond line";
+        // line 1, char 0 → 's' in "second".
+        assert_eq!(
+            word_at(content, cursor_range(1, 0)),
+            Some("second".to_owned())
+        );
+    }
+
+    #[test]
+    fn word_at_nonexistent_line_is_none() {
+        assert_eq!(word_at("one line only", cursor_range(99, 0)), None);
+    }
+
+    #[test]
+    fn word_at_word_with_underscores() {
+        // "some_var = 1;" — cursor on 'v' (char 5).
+        assert_eq!(
+            word_at("some_var = 1;", cursor_range(0, 5)),
+            Some("some_var".to_owned())
+        );
+    }
+
+    #[test]
+    fn word_at_multiline_selection_uses_start_position_for_cursor_word() {
+        // Multi-line selection falls through to case 2 using range.start.
+        // Line 0 char 4 is 'f' in "foo".
+        let content = "let foo = 1;\nbar baz";
+        let range = make_range(0, 4, 1, 3);
+        assert_eq!(word_at(content, range), Some("foo".to_owned()));
+    }
+
+    #[test]
+    fn word_at_selection_with_bmp_multibyte_chars() {
+        // "中文 hello" — '中' and '文' are each 1 UTF-16 unit (3 UTF-8 bytes).
+        // "hello" starts at UTF-16 offset 3, ends at offset 8.
+        let range = make_range(0, 3, 0, 8);
+        assert_eq!(word_at("中文 hello", range), Some("hello".to_owned()));
+    }
+
+    #[test]
+    fn word_at_cursor_after_surrogate_pair() {
+        // "😀foo" — emoji is 2 UTF-16 units; 'f' starts at UTF-16 offset 2.
+        assert_eq!(word_at("😀foo", cursor_range(0, 2)), Some("foo".to_owned()));
+    }
+
+    #[test]
+    fn word_at_empty_selection_text_after_trim_is_none() {
+        // Selecting only whitespace (e.g., a space) should yield None.
+        let range = make_range(0, 3, 0, 4); // the space in "foo bar"
+        assert_eq!(word_at("foo bar", range), None);
+    }
+
+    #[test]
+    fn word_at_num_colors_cycle() {
+        // Sanity-check that NUM_COLORS equals the token type legend length.
+        assert_eq!(NUM_COLORS, TOKEN_TYPE_NAMES.len());
+    }
+}

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Report `LanguageServerInstallationStatus::Failed` to Zed in case of errors in the install process.
 - Add some supported languages to the extension manifest.
 - Add a GitHub Actions workflow to publish LSP server binaries to GitHub Releases on new version tags.
+- Add unit tests for the extension and the LSP server with the help of my friend Claude.
 
 ### Changed
 
