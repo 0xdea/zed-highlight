@@ -27,7 +27,7 @@ cargo install --path lsp
 # and select this repo's directory.
 ```
 
-CI (`.github/workflows/build.yml`) runs fmt, clippy (warnings-as-errors), test, build, and `cargo-semver-checks` on Linux; build+test on macOS and Windows. Match those locally before pushing.
+CI (`.github/workflows/build.yml`) runs fmt, clippy (warnings-as-errors), test, and build on Linux; build+test on macOS and Windows. Match those locally before pushing.
 
 ## Lint posture
 
@@ -50,7 +50,7 @@ State model: a single shared `State` (behind `tokio::sync::Mutex`) holds the lis
 
 Word slot semantics: `words: Vec<Option<String>>`. Soft-delete leaves `None` in place so existing colors don't shift when a word is removed; new words reuse the first `None` slot before growing the Vec. The visible color index is `slot_index % NUM_COLORS` (8), so a 9th simultaneous highlight reuses color 0.
 
-Refresh model: state changes don't push tokens directly. They call either `immediate_refresh` (user actions like toggle/clear — cancel any pending debounce, send `workspace/semanticTokens/refresh` now) or `debounced_refresh` (document edits — coalesce rapid edits into a single refresh after `DEBOUNCE_DELAY_MS = 250ms`). Zed then re-requests via `semantic_tokens_full`, which calls `build_tokens` to do the scan. This means `did_open`/`did_change` must populate `state.docs` *before* scheduling the refresh; the debounce window also acts as a safety net for races.
+Refresh model: state changes don't push tokens directly. They call either `immediate_refresh` (user actions like toggle/clear — cancel any pending debounce, send `workspace/semanticTokens/refresh` now) or `debounced_refresh` (document edits — coalesce rapid edits into a single refresh after `DEBOUNCE_DELAY_MS = 250ms`). Zed then re-requests via `semantic_tokens_full`, which calls `build_tokens` to do the scan. This means `did_open`/`did_change` must populate `state.docs` _before_ scheduling the refresh; the debounce window also acts as a safety net for races.
 
 Token encoding: `build_tokens` collects absolute `(line, start, length, token_type)` matches, sorts them, then converts to the LSP delta encoding (`delta_start` resets to absolute whenever `delta_line > 0`). Character offsets are in **UTF-16 code units** per the LSP spec — see `utf16_len` and `utf16_to_byte`. Don't accidentally use byte offsets when interacting with `Range`/`Position`.
 
