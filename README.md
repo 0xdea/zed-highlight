@@ -29,7 +29,7 @@ Words are matched whole-word and case-sensitively by default. Up to 8 words can 
 The following features are currently supported by the extension and the bundled LSP server:
 
 - Easy access to the following code actions via the `editor: toggle code actions` menu (`⌘.` shortcut or lightning bolt icon in the gutter):
-  - `Highlight` or `Remove highlight` - Toggle highlighting on and off for the current selection.
+  - `Toggle highlight` - Toggle highlighting on and off for the current selection or cursor position.
   - `Clear all highlights` - Remove all active highlights with a single command.
 - Configurable highlight colors (via `settings.json`).
 
@@ -188,7 +188,7 @@ The `50` suffix on background colors is an alpha value in hex (roughly 31% opaci
 
 Place the cursor on a word (or select a range of text) and open the code actions menu via `editor: toggle code actions` in the command palette or by pressing the default shortcut `⌘.` (or the lightning bolt icon in the gutter). The following actions are available depending on context:
 
-- `Highlight` or `Remove highlight` - Toggle highlighting on and off for the current selection.
+- `Toggle highlight` - Toggle highlighting on and off for the current selection or cursor position.
 - `Clear all highlights` - Remove all active highlights with a single command.
 
 ## Compatibility

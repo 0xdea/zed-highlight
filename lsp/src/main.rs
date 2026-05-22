@@ -119,13 +119,6 @@ impl State {
         self.words.iter().any(Option::is_some)
     }
 
-    /// Check whether a word is currently highlighted.
-    fn is_highlighted(&self, word: &str) -> bool {
-        self.words
-            .iter()
-            .any(|o| o.as_deref().is_some_and(|w| self.words_eq(w, word)))
-    }
-
     /// Clear all highlighted words.
     fn words_clear(&mut self) {
         self.words.clear();
@@ -170,6 +163,10 @@ impl Backend {
 
     /// Cancel any pending debounced refresh and send a `workspace/semanticTokens/refresh` request to Zed right now.
     /// Used after user-driven actions (toggle/clear) where we want the highlight change to appear without delay.
+    ///
+    /// Zed does not implement `workspace/codeAction/refresh`, so it cannot be signalled to re-fetch code actions
+    /// after a state change. The code action titles are therefore kept stateless (see [`LanguageServer::code_action`])
+    /// so that Zed's cached response remains accurate regardless of the direction of the last toggle.
     #[expect(
         clippy::let_underscore_must_use,
         reason = "Errors from the refresh request are intentionally ignored."
@@ -337,8 +334,8 @@ impl LanguageServer for Backend {
                 ),
 
                 // Code actions appear in the "editor: toggle code actions" menu (accessed with the `⌘.` shortcut or the
-                // lightning bolt icon in the gutter). We use them to surface `Highlight: <word>`, `Remove highlight:
-                // <word>`, and `Clear all highlights` actions without requiring the user to bind a custom keymap entry.
+                // lightning bolt icon in the gutter). We use them to surface `Toggle highlight: <word>` and `Clear all
+                // highlights` actions.
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
 
                 // Register each supported command name so Zed knows to route `executeCommand` calls to this server.
@@ -442,8 +439,14 @@ impl LanguageServer for Backend {
     /// Called whenever Zed opens the "editor: toggle code actions" menu.
     ///
     /// We return up to two actions:
-    /// - `Highlight: <word>` or `Remove highlight: <word>` (if cursor is on a word or selection).
+    /// - `Toggle highlight: <word>` (if cursor is on a valid word or selection).
     /// - `Clear all highlights` (only if there are any active highlights).
+    ///
+    /// The toggle action deliberately uses a stateless title ("Toggle highlight") rather than a state-dependent one
+    /// ("Highlight" vs "Remove highlight"). Zed caches code action responses by cursor position and only invalidates
+    /// that cache on cursor movement or document edits. A stateless title is therefore always accurate regardless of
+    /// when Zed last fetched the response, and avoids the confusing mismatch of seeing "Highlight: foo" when the word
+    /// is already highlighted (or vice versa) without the user having moved their cursor.
     async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
         // Snapshot the state.
         let state = self.state.lock().await;
@@ -453,11 +456,10 @@ impl LanguageServer for Backend {
         };
         let has_any = state.has_any();
 
-        // Find the highlightable word the user is acting on, if any, and determine whether it's already highlighted.
+        // Find the highlightable word the user is acting on, if any.
         let word = word_at(&content, params.range)
             .filter(|w| is_highlightable(w, state.whole_word))
             .filter(|w| matches_anywhere(&content, w, state.whole_word, state.ignore_case));
-        let already_highlighted = word.as_deref().is_some_and(|w| state.is_highlighted(w));
 
         // Explicitly release the lock before building the response.
         drop(state);
@@ -467,13 +469,8 @@ impl LanguageServer for Backend {
 
         // Highlight toggle action for the current word, if any.
         if let Some(ref w) = word {
-            let title = if already_highlighted {
-                format!("Remove highlight: \"{w}\"")
-            } else {
-                format!("Highlight: \"{w}\"")
-            };
             actions.push(CodeActionOrCommand::CodeAction(CodeAction {
-                title,
+                title: format!("Toggle highlight: \"{w}\""),
                 kind: Some(CodeActionKind::EMPTY),
                 // The [`Command`] is embedded in the [`CodeAction`] and passed back to [`Backend::execute_command]`
                 // when the user selects this item. We encode the word as the single argument.
@@ -806,8 +803,10 @@ mod tests {
         s.ignore_case = true;
         s.toggle("Foo");
         s.toggle("foo"); // should match "Foo" and remove it
-        assert!(!s.is_highlighted("foo"));
-        assert!(!s.is_highlighted("Foo"));
+        assert!(
+            !s.has_any(),
+            "case-insensitive toggle of the same word must leave no highlights"
+        );
     }
 
     // Test `State::has_any`.
@@ -839,30 +838,6 @@ mod tests {
         s.toggle("b");
         s.toggle("a"); // remove "a", keep "b"
         assert!(s.has_any());
-    }
-
-    // Test `State::is_highlighted`.
-
-    #[test]
-    fn state_is_highlighted_true_for_present_word() {
-        let mut s = State::new();
-        s.toggle("foo");
-        assert!(s.is_highlighted("foo"));
-    }
-
-    #[test]
-    fn state_is_highlighted_false_for_absent_word() {
-        let mut s = State::new();
-        s.toggle("foo");
-        assert!(!s.is_highlighted("bar"));
-    }
-
-    #[test]
-    fn state_is_highlighted_false_after_removal() {
-        let mut s = State::new();
-        s.toggle("foo");
-        s.toggle("foo");
-        assert!(!s.is_highlighted("foo"));
     }
 
     // Test `State::words_clear`.
@@ -1487,6 +1462,42 @@ mod integration {
         );
     }
 
+    /// Request code actions at the given cursor position and return their titles in order.
+    async fn code_action(
+        svc: &mut Svc,
+        id: u32,
+        uri: &str,
+        line: u32,
+        character: u32,
+    ) -> Vec<String> {
+        let res = call_inner(
+            svc,
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "method": "textDocument/codeAction",
+                "params": {
+                    "textDocument": { "uri": uri },
+                    "range": {
+                        "start": { "line": line, "character": character },
+                        "end":   { "line": line, "character": character }
+                    },
+                    "context": { "diagnostics": [] }
+                }
+            }),
+        )
+        .await
+        .unwrap();
+        res["result"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v["title"].as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Request the full semantic token list for a document and return the raw flat `data` array. Each token is encoded
     /// as 5 consecutive u32s: `delta_line`, `delta_start`, `length`, `token_type`, `token_modifiers`.
     async fn get_tokens(svc: &mut Svc, id: u32, uri: &str) -> Vec<u32> {
@@ -1675,6 +1686,38 @@ mod integration {
         close(&mut svc, URI).await;
         let data2 = get_tokens(&mut svc, 3, URI).await;
         assert!(data2.is_empty(), "evicted document returns no tokens");
+    }
+
+    /// The toggle code action must use a stateless title ("Toggle highlight") that stays accurate regardless of when
+    /// Zed last fetched the response. Zed caches code actions by cursor position and only invalidates that cache on
+    /// cursor movement or document edits, so a state-dependent title ("Highlight" vs "Remove highlight") would be
+    /// stale and misleading after a toggle without cursor movement. The stateless title is the server-side workaround
+    /// for the missing `workspace/codeAction/refresh` support in Zed.
+    #[tokio::test]
+    async fn code_action_title_is_stateless() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "foo bar").await;
+
+        // Before and after toggling, the code action title must be the same stateless string.
+        let actions_before = code_action(&mut svc, 1, URI, 0, 0).await;
+        toggle(&mut svc, 2, "foo").await;
+        let actions_after = code_action(&mut svc, 3, URI, 0, 0).await;
+        toggle(&mut svc, 4, "foo").await;
+        let actions_after2 = code_action(&mut svc, 5, URI, 0, 0).await;
+
+        let expected = r#"Toggle highlight: "foo""#;
+        assert!(
+            actions_before.iter().any(|a| a == expected),
+            "expected stateless title before any toggle; got: {actions_before:?}"
+        );
+        assert!(
+            actions_after.iter().any(|a| a == expected),
+            "expected stateless title after toggle on; got: {actions_after:?}"
+        );
+        assert!(
+            actions_after2.iter().any(|a| a == expected),
+            "expected stateless title after toggle off; got: {actions_after2:?}"
+        );
     }
 
     /// The LSP spec requires character offsets in UTF-16 code units, not bytes. '中' and '文' are each 1 UTF-16 unit

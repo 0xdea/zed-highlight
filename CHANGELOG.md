@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specify stricter version requirements for dependencies.
 - Update documentation and polish everything for release.
 
+### Fixed
+
+- Use a stateless `Toggle highlight` code action title to prevent stale code actions after toggling highlights.
+
 ## [0.1.0] - 2026-05-10
 
 - First pre-release of the LSP to be published to [crates.io](https://crates.io/).

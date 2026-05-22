@@ -27,7 +27,11 @@ cargo install --path lsp
 # and select this repo's directory.
 ```
 
-CI (`.github/workflows/build.yml`) runs fmt, clippy (warnings-as-errors), test, and build on Linux; build+test on macOS and Windows. Match those locally before pushing.
+Three CI workflows live in `.github/workflows/`:
+
+- `build.yml` — runs on every push to `master`: fmt, clippy (warnings-as-errors), test, and build on Linux; test+build on macOS and Windows. Match these locally before pushing.
+- `release.yml` — triggers on `v*` tags: cross-compiles the LSP binary for all platforms and publishes a GitHub Release with the archives.
+- `publish.yml` — triggers on `v*` tags: opens a PR against `zed-industries/extensions` to bump the extension version in their registry. Requires a `ZED_EXTENSIONS_TOKEN` secret (GitHub PAT with `repo` scope).
 
 ## Lint posture
 
@@ -59,6 +63,8 @@ Matching: words are compiled to a `Regex` via `compile_word_regex`. Default flag
 Word resolution: `word_at` handles two cases — non-empty single-line selection uses the selection verbatim; cursor-only (or multi-line selection) scans `\w`-class chars left/right from the cursor. "Word char" is `is_alphanumeric() || '_'`.
 
 Commands: only two are registered with Zed (`zed-highlight.toggle`, `zed-highlight.clear`). Both are surfaced via `code_action`, not bound to keymaps — users invoke them via `editor: toggle code actions` (`⌘.`).
+
+Code action title: the toggle action always uses the stateless label `Toggle highlight: "<word>"` rather than a state-dependent `Highlight` / `Remove highlight`. Zed caches code action responses by cursor position and only invalidates that cache on cursor movement or document edits — it does not implement `workspace/codeAction/refresh`. A stateless title is always accurate regardless of when Zed last fetched the response, avoiding the confusing mismatch of seeing `Highlight: "foo"` when the word is already highlighted (or vice versa) without the user having moved the cursor. Don't revert this to a state-dependent title without first verifying that Zed has added `workspace/codeAction/refresh` support.
 
 ### Adding a new supported language
 
