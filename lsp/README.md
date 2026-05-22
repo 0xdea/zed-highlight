@@ -3,10 +3,10 @@
 [![](https://img.shields.io/github/stars/0xdea/zed-highlight.svg?style=flat&color=yellow)](https://github.com/0xdea/zed-highlight)
 [![](https://img.shields.io/crates/v/zed-highlight-lsp?style=flat&color=green)](https://crates.io/crates/zed-highlight-lsp)
 [![](https://img.shields.io/crates/d/zed-highlight-lsp?style=flat&color=red)](https://crates.io/crates/zed-highlight-lsp)
-[![](https://img.shields.io/badge/zed-1.2.6-violet)](https://zed.dev/extensions/html/highlight)
+[![](https://img.shields.io/badge/zed-1.3.5-violet)](https://zed.dev/extensions/html/highlight)
 [![](https://img.shields.io/badge/twitter-%400xdea-blue.svg)](https://twitter.com/0xdea)
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
-[![check](https://github.com/0xdea/zed-highlight/actions/workflows/check.yml/build.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
+[![check](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
 [![release](https://github.com/0xdea/zed-highlight/actions/workflows/release.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/release.yml)
 [![extension](https://github.com/0xdea/zed-highlight/actions/workflows/publish.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/publish.yml)
 
@@ -49,7 +49,7 @@ The LSP server is automatically launched by the [Highlight](https://zed.dev/exte
 
 ## Compatibility
 
-The latest release was tested with Zed 1.2.6 on:
+The latest release was tested with Zed 1.3.5 on:
 
 - Apple macOS Tahoe 26.4.1
 
