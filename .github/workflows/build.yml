@@ -29,19 +29,12 @@ jobs:
           components: rustfmt, clippy
       - name: sccache
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
-      # - name: dependencies
-      #   run: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y libxdo-dev
       - name: rustfmt
         run: cargo fmt --all --check
       - name: clippy
-        run: cargo clippy --all-targets -- -D warnings
-      # - name: nextest
-      #   uses: taiki-e/install-action@cargo-nextest
+        run: cargo clippy --workspace --all-targets -- -D warnings
       - name: test
-        run: cargo test
-      #   run: cargo nextest run
+        run: cargo test --workspace
       - name: build
         run: cargo build
       - name: semver-checks
@@ -60,11 +53,8 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
       - name: sccache
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
-      # - name: nextest
-      #   uses: taiki-e/install-action@cargo-nextest
       - name: test
-        run: cargo test
-      #   run: cargo nextest run
+        run: cargo test --workspace
       - name: build
         run: cargo build
 
@@ -81,10 +71,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
       - name: sccache
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
-      # - name: nextest
-      #   uses: taiki-e/install-action@cargo-nextest
       - name: test
-        run: cargo test
-      #   run: cargo nextest run
+        run: cargo test --workspace
       - name: build
         run: cargo build

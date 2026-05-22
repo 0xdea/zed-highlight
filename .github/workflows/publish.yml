@@ -1,0 +1,65 @@
+name: publish
+
+# Requires a personal access token with `repo` scope stored as
+# `ZED_EXTENSIONS_TOKEN` in repository secrets. The token must belong to a
+# GitHub account that can fork `zed-industries/extensions` and open pull
+# requests against it.
+
+permissions:
+  contents: read
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: publish to zed marketplace
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: extract version
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: open pull request on zed-industries/extensions
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.ZED_EXTENSIONS_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          FORK_OWNER=$(gh api user --jq .login)
+          BRANCH="bump/highlight-${VERSION}"
+
+          # Fork zed-industries/extensions (no-op if already forked) and clone it.
+          gh repo fork zed-industries/extensions --clone
+          cd extensions
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+
+          # Bump the version field inside the [highlight] section only.
+          sed -i "/^\[highlight\]/,/^\[/{s/^version = .*/version = \"${VERSION}\"/}" extensions.toml
+
+          git add extensions.toml
+          if git diff --staged --quiet; then
+            echo "Highlight is already at ${VERSION} in the registry — nothing to publish"
+            exit 0
+          fi
+
+          git commit -m "Bump highlight to ${VERSION}"
+          git push origin "${BRANCH}"
+          gh pr create \
+            --repo zed-industries/extensions \
+            --title "Bump highlight to ${VERSION}" \
+            --body "Automated version bump for the [highlight](https://github.com/0xdea/zed-highlight) extension to v${VERSION}." \
+            --base main \
+            --head "${FORK_OWNER}:${BRANCH}"
