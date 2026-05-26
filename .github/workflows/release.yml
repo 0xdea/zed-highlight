@@ -46,12 +46,12 @@ jobs:
 
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            name: zed-highlight-lsp-windows-x86_64.zip
+            name: zed-highlight-lsp-windows-x86_64.tar.gz
             arch: x86_64
 
           # - target: aarch64-pc-windows-msvc
           #   os: windows-latest
-          #   name: zed-highlight-lsp-windows-aarch64.zip
+          #   name: zed-highlight-lsp-windows-aarch64.tar.gz
           #   arch: aarch64
 
     steps:
