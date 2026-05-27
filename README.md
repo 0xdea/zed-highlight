@@ -28,7 +28,7 @@ Words are matched whole-word and case-sensitively by default. Up to 8 words can 
 
 The following features are currently supported by the extension and the bundled LSP server:
 
-- Easy access to the following code actions via the `editor: toggle code actions` menu (`⌘.` shortcut or lightning bolt icon in the gutter):
+- Easy access to the following code actions via the `editor: toggle code actions` menu (`⌘.`/`ctrl+.` shortcut or lightning bolt icon in the gutter):
   - `Toggle highlight` - Toggle highlighting on and off for the current selection or cursor position.
   - `Clear all highlights` - Remove all active highlights with a single command.
 - Configurable highlight colors (via `settings.json`).
@@ -130,6 +130,8 @@ Then, configure the foreground and background colors for each of the 8 semantic 
 }
 ```
 
+The `50` suffix on background colors is an alpha value in hex (roughly 31% opacity). You can adjust the colors and opacity to your taste.
+
 An alternative color scheme that should be more suitable for light themes is provided below:
 
 ```json
@@ -140,53 +142,53 @@ An alternative color scheme that should be more suitable for light themes is pro
       {
         "token_type": "zed-highlight-0",
         "foreground_color": "#B3D9FF",
-        "background_color": "#B3D9FF50"
+        "background_color": "#B3D9FF40"
       },
       {
         "token_type": "zed-highlight-1",
         "foreground_color": "#B3B3FF",
-        "background_color": "#B3B3FF50"
+        "background_color": "#B3B3FF40"
       },
       {
         "token_type": "zed-highlight-2",
-        "foreground_color": "#FFD9B3",
-        "background_color": "#FFD9B350"
+        "foreground_color": "#DFB9B3",
+        "background_color": "#DFB9B340"
       },
       {
         "token_type": "zed-highlight-3",
         "foreground_color": "#FFB3FF",
-        "background_color": "#FFB3FF50"
+        "background_color": "#FFB3FF40"
       },
       {
         "token_type": "zed-highlight-4",
-        "foreground_color": "#B3FFB3",
-        "background_color": "#B3FFB350"
+        "foreground_color": "#93DFB3",
+        "background_color": "#93DFB340"
       },
       {
         "token_type": "zed-highlight-5",
-        "foreground_color": "#D1E0E0",
-        "background_color": "#D1E0E050"
+        "foreground_color": "#B1C0E0",
+        "background_color": "#B1C0E040"
       },
       {
         "token_type": "zed-highlight-6",
-        "foreground_color": "#FFFF80",
-        "background_color": "#FFFF8050"
+        "foreground_color": "#DFDF80",
+        "background_color": "#DFDF8040"
       },
       {
         "token_type": "zed-highlight-7",
-        "foreground_color": "#E6FFB3",
-        "background_color": "#E6FFB350"
+        "foreground_color": "#C6DFB3",
+        "background_color": "#C6DFB340"
       }
     ]
   }
 }
 ```
 
-The `50` suffix on background colors is an alpha value in hex (roughly 31% opacity). You can adjust the colors and opacity to your taste.
+See Zed's [documentation](https://zed.dev/docs/semantic-tokens#customizing-token-colors) for further customization options.
 
 ## Usage
 
-Place the cursor on a word (or select a range of text) and open the code actions menu via `editor: toggle code actions` in the command palette or by pressing the default shortcut `⌘.` (or the lightning bolt icon in the gutter). The following actions are available depending on context:
+Place the cursor on a word (or select a range of text) and open the code actions menu via `editor: toggle code actions` in the command palette or by pressing the default shortcut `⌘.`/`ctrl+.` (or the lightning bolt icon in the gutter). The following actions are available depending on context:
 
 - `Toggle highlight` - Toggle highlighting on and off for the current selection or cursor position.
 - `Clear all highlights` - Remove all active highlights with a single command.

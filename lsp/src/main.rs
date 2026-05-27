@@ -335,9 +335,9 @@ impl LanguageServer for Backend {
                     ),
                 ),
 
-                // Code actions appear in the "editor: toggle code actions" menu (accessed with the `⌘.` shortcut or the
-                // lightning bolt icon in the gutter). We use them to surface `Toggle highlight: <word>` and `Clear all
-                // highlights` actions.
+                // Code actions appear in the "editor: toggle code actions" menu (accessed with the `⌘.`/`ctrl+.`
+                // shortcut or the lightning bolt icon in the gutter). We use them to surface the `Toggle highlight:
+                // <word>` and `Clear all highlights` actions.
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
 
                 // Register each supported command name so Zed knows to route `executeCommand` calls to this server.

@@ -45,9 +45,9 @@ jobs:
             os: windows-latest
             name: zed-highlight-lsp-windows-x86_64.tar.gz
 
-          # - target: aarch64-pc-windows-msvc
-          #   os: windows-latest
-          #   name: zed-highlight-lsp-windows-aarch64.tar.gz
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            name: zed-highlight-lsp-windows-aarch64.tar.gz
 
     steps:
       - name: checkout

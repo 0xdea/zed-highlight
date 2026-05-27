@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use `Arc` in `State::docs` to avoid cloning a full document under the lock in LSP server's `build_tokens`.
 - Use `RegexBuilder` instead of `Regex` for readability.
 - Improve CI workflows.
+- Improve the example color scheme for light themes in the documentation.
 - Update documentation.
 - Update dependencies.
 
