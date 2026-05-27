@@ -12,7 +12,7 @@ use std::option::Option;
 use std::sync::Arc;
 use std::time::Duration;
 
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use tokio::sync::Mutex;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
@@ -679,17 +679,16 @@ fn matches_anywhere(content: &str, text: &str, whole_word: bool, ignore_case: bo
 fn compile_word_regex(word: &str, whole_word: bool, ignore_case: bool) -> Option<Regex> {
     // Treat the word as a literal string by escaping it.
     let escaped = regex::escape(word);
-    let mut pattern = if whole_word {
+    let pattern = if whole_word {
         // The word-boundary assertion prevents "for" from matching inside "format".
         format!(r"\b{escaped}\b")
     } else {
         escaped
     };
-    if ignore_case {
-        // Make the entire pattern case-insensitive.
-        pattern = format!("(?i){pattern}");
-    }
-    Regex::new(&pattern).ok()
+    RegexBuilder::new(&pattern)
+        .case_insensitive(ignore_case)
+        .build()
+        .ok()
 }
 
 /// Entry point of the LSP server.

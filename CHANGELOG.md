@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Move the directory pruning step in the extension so that any stale directories are self-healed.
 - Use `Arc` in `State::docs` to avoid cloning a full document under the lock in LSP server's `build_tokens`.
+- Use `RegexBuilder` instead of `Regex` for readability.
 - Update documentation.
 - Update dependencies.
 
