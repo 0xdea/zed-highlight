@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move the prune step in the extension so it runs regardless of whether the LSP binary was already on disk.
 - Update documentation.
 - Update dependencies.
 

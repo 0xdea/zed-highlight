@@ -165,17 +165,18 @@ impl HighlightExtension {
             // Ensure the binary is executable (this is a no-op on Windows or if the bit is already set).
             zed::make_file_executable(&binary_path)
                 .map_err(|e| format!("failed to make {BINARY_NAME} executable: {e}"))?;
+        }
 
-            // Remove all other directories to avoid unbounded disk growth.
-            #[expect(
-                clippy::let_underscore_must_use,
-                reason = "Errors here are non-fatal and can be safely ignored."
-            )]
-            if let Ok(entries) = fs::read_dir(".") {
-                for entry in entries.flatten() {
-                    if entry.file_name().to_str() != Some(&version_dir) {
-                        let _ = fs::remove_dir_all(entry.path());
-                    }
+        // Remove any other directories to avoid unbounded disk growth. Runs unconditionally so that we self-heal when a
+        // previous install succeeded but the prune step failed or was interrupted on an earlier run.
+        #[expect(
+            clippy::let_underscore_must_use,
+            reason = "Errors here are non-fatal and can be safely ignored."
+        )]
+        if let Ok(entries) = fs::read_dir(".") {
+            for entry in entries.flatten() {
+                if entry.file_name().to_str() != Some(&version_dir) {
+                    let _ = fs::remove_dir_all(entry.path());
                 }
             }
         }
