@@ -20,6 +20,7 @@ jobs:
   build-all:
     name: build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -27,32 +28,26 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             name: zed-highlight-lsp-linux-x86_64.tar.gz
-            arch: x86_64
 
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             name: zed-highlight-lsp-linux-aarch64.tar.gz
-            arch: aarch64
 
           - target: x86_64-apple-darwin
             os: macOS-latest
             name: zed-highlight-lsp-darwin-x86_64.tar.gz
-            arch: x86_64
 
           - target: aarch64-apple-darwin
             os: macOS-latest
             name: zed-highlight-lsp-darwin-aarch64.tar.gz
-            arch: aarch64
 
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             name: zed-highlight-lsp-windows-x86_64.tar.gz
-            arch: x86_64
 
           # - target: aarch64-pc-windows-msvc
           #   os: windows-latest
           #   name: zed-highlight-lsp-windows-aarch64.tar.gz
-          #   arch: aarch64
 
     steps:
       - name: checkout
@@ -71,7 +66,7 @@ jobs:
           TARGET: ${{ matrix.target }}
         shell: bash
         run: |
-          cargo build --release --manifest-path lsp/Cargo.toml --target "$TARGET"
+          cargo build --release --locked --manifest-path lsp/Cargo.toml --target "$TARGET"
       - name: dependencies
         if: matrix.os == 'ubuntu-latest'
         uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
@@ -83,25 +78,19 @@ jobs:
           TARGET: ${{ matrix.target }}
         shell: bash
         run: |
-          cross build --release --manifest-path lsp/Cargo.toml --target "$TARGET"
+          cross build --release --locked --manifest-path lsp/Cargo.toml --target "$TARGET"
       - name: package
-        if: matrix.os != 'windows-latest'
         env:
           TARGET: ${{ matrix.target }}
           NAME: ${{ matrix.name }}
         shell: bash
         run: |
           cd "target/$TARGET/release"
-          tar czf "../../../$NAME" zed-highlight-lsp
-      - name: package-windows
-        if: matrix.os == 'windows-latest'
-        env:
-          TARGET: ${{ matrix.target }}
-          NAME: ${{ matrix.name }}
-        shell: bash
-        run: |
-          cd "target/$TARGET/release"
-          tar czf "../../../$NAME" zed-highlight-lsp.exe
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            tar czf "../../../$NAME" zed-highlight-lsp.exe
+          else
+            tar czf "../../../$NAME" zed-highlight-lsp
+          fi
       - name: upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -112,6 +101,7 @@ jobs:
     name: release
     needs: build-all
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write # needed to create the github release and upload assets
     steps:
