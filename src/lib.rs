@@ -133,7 +133,7 @@ impl HighlightExtension {
         // - A cached binary from the current version is reused without re-downloading.
         // - Upgrading to a new release stores the new binary in a different directory and cleans up the old ones.
         let version_dir = version_dir_name(&release.version);
-        let binary_path = binary_path_in_version(&release.version);
+        let binary_path = binary_path_in_version(&release.version, os);
 
         // Download and extract the binary if it's not already present.
         if !fs::metadata(&binary_path).is_ok_and(|m| m.is_file()) {
@@ -208,9 +208,21 @@ fn version_dir_name(version: &str) -> String {
     format!("{BINARY_NAME}-{version}")
 }
 
-/// Helper function to return the path to the binary within its versioned directory.
-fn binary_path_in_version(version: &str) -> String {
-    format!("{}/{BINARY_NAME}", version_dir_name(version))
+/// Helper function to return the executable file name for the given OS.
+///
+/// On Windows the LSP binary is shipped as `zed-highlight-lsp.exe`; on Unix-like systems it has no extension. The
+/// suffix matters because we use this name both to probe the cache with [`fs::metadata`] and to hand the path back to
+/// Zed for [`zed::Command`] spawning.
+fn binary_file_name(os: zed::Os) -> String {
+    match os {
+        zed::Os::Windows => format!("{BINARY_NAME}.exe"),
+        zed::Os::Mac | zed::Os::Linux => BINARY_NAME.to_owned(),
+    }
+}
+
+/// Helper function to return the path to the binary within its versioned directory for the given OS.
+fn binary_path_in_version(version: &str, os: zed::Os) -> String {
+    format!("{}/{}", version_dir_name(version), binary_file_name(os))
 }
 
 /// Register as a Zed extension.
@@ -317,13 +329,41 @@ mod tests {
         assert_eq!(version_dir_name("0.1.0"), "zed-highlight-lsp-0.1.0");
     }
 
+    // Test `binary_file_name`.
+
+    #[test]
+    fn binary_file_name_on_unix_has_no_extension() {
+        assert_eq!(binary_file_name(zed::Os::Mac), "zed-highlight-lsp");
+        assert_eq!(binary_file_name(zed::Os::Linux), "zed-highlight-lsp");
+    }
+
+    #[test]
+    fn binary_file_name_on_windows_has_exe_extension() {
+        assert_eq!(binary_file_name(zed::Os::Windows), "zed-highlight-lsp.exe");
+    }
+
     // Test `binary_path_in_version`.
 
     #[test]
-    fn binary_path_in_version_format_is_correct() {
+    fn binary_path_in_version_format_is_correct_on_unix() {
         assert_eq!(
-            binary_path_in_version("0.1.0"),
+            binary_path_in_version("0.1.0", zed::Os::Mac),
             "zed-highlight-lsp-0.1.0/zed-highlight-lsp"
+        );
+        assert_eq!(
+            binary_path_in_version("0.1.0", zed::Os::Linux),
+            "zed-highlight-lsp-0.1.0/zed-highlight-lsp"
+        );
+    }
+
+    #[test]
+    fn binary_path_in_version_format_is_correct_on_windows() {
+        // Regression test: on Windows the archive contains `zed-highlight-lsp.exe`, so the path used for cache probing
+        // and for spawning the language server must include the `.exe` suffix. Forgetting it causes Zed to re-download
+        // on every session and then fail to start the LSP because the resolved path doesn't exist.
+        assert_eq!(
+            binary_path_in_version("0.1.0", zed::Os::Windows),
+            "zed-highlight-lsp-0.1.0/zed-highlight-lsp.exe"
         );
     }
 
@@ -331,11 +371,16 @@ mod tests {
     fn binary_path_uses_forward_slash() {
         // The path is passed to `zed::make_file_executable` and `zed::download_file`, both of which expect POSIX-style
         // paths because the extension runs inside a WASM sandbox.
-        let path = binary_path_in_version("0.1.0");
-        assert!(path.contains('/'), "binary path must use '/' as separator");
-        assert!(
-            !path.contains('\\'),
-            "binary path must not use '\\' as separator"
-        );
+        for os in [zed::Os::Mac, zed::Os::Linux, zed::Os::Windows] {
+            let path = binary_path_in_version("0.1.0", os);
+            assert!(
+                path.contains('/'),
+                "binary path must use '/' as separator (os: {os:?})"
+            );
+            assert!(
+                !path.contains('\\'),
+                "binary path must not use '\\' as separator (os: {os:?})"
+            );
+        }
     }
 }

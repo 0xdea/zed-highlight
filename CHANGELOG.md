@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update documentation.
 - Update dependencies.
 
+### Fixed
+
+- Compute the correct path to the LSP server binary on Windows in the extension.
+
 ## [0.1.1] - 2026-05-26
 
 ### Added
