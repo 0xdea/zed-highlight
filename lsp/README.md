@@ -27,7 +27,7 @@ Highlight LSP is a language server implemented for the [Zed editor](https://zed.
 
 ## Installing
 
-For regular use, Highlight LSP is installed automatically by the [Highlight](https://zed.dev/extensions/html/highlight) extension.
+For regular use, the proper release binary of Highlight LSP is installed automatically by the [Highlight](https://zed.dev/extensions/html/highlight) extension.
 
 If you want to install it manually, you can do so via [crates.io](https://crates.io/crates/zed-highlight-lsp):
 

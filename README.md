@@ -207,7 +207,6 @@ The latest release was tested with Zed 1.3.7 on:
 
 ## TODO
 
-- Release to the Zed marketplace and [crates.io](https://crates.io/).
 - Add a minimal command-line interface for manual use of the LSP server outside of Zed.
 - Add customizable settings (e.g., `whole_word` and `ignore_case` flags that are already suppported by the LSP).
 - Investigate whether it's possible to ship a default `semantic_token_rules.json` file with the extension.
