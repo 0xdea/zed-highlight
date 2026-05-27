@@ -195,9 +195,11 @@ Place the cursor on a word (or select a range of text) and open the code actions
 
 ## Compatibility
 
-The latest release was tested with Zed 1.3.7 on:
+The latest release was tested with Zed 1.3.7 (ARM64) on:
 
 - Apple macOS Tahoe 26.4.1
+- Ubuntu Linux 24.04.3 LTS
+- Microsoft Windows 11 23H2
 
 ## Credits
 
@@ -210,7 +212,7 @@ The latest release was tested with Zed 1.3.7 on:
 ## TODO
 
 - Add a minimal command-line interface for manual use of the LSP server outside of Zed.
-- Add and test customizable settings (e.g., `whole_word` and `ignore_case` flags that are already present in the LSP).
+- Add and test customizable settings (e.g., `whole_word` and `ignore_case` flags).
 - Add highlighting based on regular expressions.
 - Add a sidebar for navigation between currently highlighted words.
 - Consider migrating to [tower-lsp-server](https://crates.io/crates/tower-lsp-server) that is maintained upstream.

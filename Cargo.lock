@@ -1058,14 +1058,14 @@ dependencies = [
 
 [[package]]
 name = "zed-highlight"
-version = "0.1.2-alpha"
+version = "0.1.2"
 dependencies = [
  "zed_extension_api",
 ]
 
 [[package]]
 name = "zed-highlight-lsp"
-version = "0.1.2-alpha"
+version = "0.1.2"
 dependencies = [
  "regex",
  "serde_json",
