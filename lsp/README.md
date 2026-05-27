@@ -49,7 +49,7 @@ The LSP server is automatically launched by the [Highlight](https://zed.dev/exte
 
 ## Compatibility
 
-The latest release was tested with Zed 1.3.5 on:
+The latest release was tested with Zed 1.3.7 on:
 
 - Apple macOS Tahoe 26.4.1
 
