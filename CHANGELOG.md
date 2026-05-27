@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Move the prune step in the extension so it runs regardless of whether the LSP binary was already on disk.
+- Move the directory pruning step in the extension so that any stale directories are self-healed.
+- Use `Arc` in `State::docs` to avoid cloning a full document under the lock in LSP server's `build_tokens`.
 - Update documentation.
 - Update dependencies.
 

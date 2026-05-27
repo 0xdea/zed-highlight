@@ -67,8 +67,10 @@ struct State {
     /// The list of currently highlighted words. A removed slot becomes `None` and subsequent entries are not shifted.
     words: Vec<Option<String>>,
 
-    /// Full text of every open document, keyed by URI.
-    docs: HashMap<Url, String>,
+    /// Full text of every open document, keyed by URI. Stored behind `Arc` so handlers ([`Backend::build_tokens`] and
+    /// [`Backend::code_action`]) can take a cheap clone under the state lock and release it before scanning, instead of
+    /// duplicating the entire document on every request.
+    docs: HashMap<Url, Arc<str>>,
 
     /// Whether to only match whole words (e.g., "for" doesn't match inside "format").
     whole_word: bool,
@@ -165,7 +167,7 @@ impl Backend {
     /// Used after user-driven actions (toggle/clear) where we want the highlight change to appear without delay.
     ///
     /// Zed does not implement `workspace/codeAction/refresh`, so it cannot be signalled to re-fetch code actions
-    /// after a state change. The code action titles are therefore kept stateless (see [`LanguageServer::code_action`])
+    /// after a state change. The code action titles are therefore kept stateless (see [`Backend::code_action`])
     /// so that Zed's cached response remains accurate regardless of the direction of the last toggle.
     #[expect(
         clippy::let_underscore_must_use,
@@ -376,7 +378,7 @@ impl LanguageServer for Backend {
             let mut state = self.state.lock().await;
             state
                 .docs
-                .insert(params.text_document.uri, params.text_document.text);
+                .insert(params.text_document.uri, params.text_document.text.into());
             state.has_any()
         };
 
@@ -396,7 +398,9 @@ impl LanguageServer for Backend {
             // With FULL sync, there should always be exactly one content change with the full new text, but we
             // defensively handle the case where it's missing just in case.
             if let Some(change) = params.content_changes.into_iter().last() {
-                state.docs.insert(params.text_document.uri, change.text);
+                state
+                    .docs
+                    .insert(params.text_document.uri, change.text.into());
             }
             state.has_any()
         };
