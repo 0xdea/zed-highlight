@@ -472,7 +472,7 @@ impl LanguageServer for Backend {
             actions.push(CodeActionOrCommand::CodeAction(CodeAction {
                 title: format!("Toggle highlight: \"{w}\""),
                 kind: Some(CodeActionKind::EMPTY),
-                // The [`Command`] is embedded in the [`CodeAction`] and passed back to [`Backend::execute_command]`
+                // The [`Command`] is embedded in the [`CodeAction`] and passed back to [`Backend::execute_command`]
                 // when the user selects this item. We encode the word as the single argument.
                 command: Some(Command {
                     title: "Toggle Highlight".to_owned(),
