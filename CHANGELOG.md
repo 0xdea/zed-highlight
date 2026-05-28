@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Pin `tokio` version.
 
+### Removed
+
+- Remove the draft GitHub Actions workflow for publishing the extension to Zed's marketplace.
+
 ## [0.1.2] - 2026-05-27
 
 ### Changed
