@@ -335,7 +335,7 @@ impl LanguageServer for Backend {
                     ),
                 ),
 
-                // Code actions appear in the "editor: toggle code actions" menu (accessed with the `⌘.`/`ctrl+.`
+                // Code actions appear in the "editor: toggle code actions" menu (accessed with the `⌘.`/`Ctrl+.`
                 // shortcut or the lightning bolt icon in the gutter). We use them to surface the `Toggle highlight:
                 // <word>` and `Clear all highlights` actions.
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),

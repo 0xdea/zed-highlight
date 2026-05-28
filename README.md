@@ -27,7 +27,7 @@ Words are matched whole-word and case-sensitively by default. Up to 8 words can 
 
 The following features are currently supported by the extension and the bundled LSP server:
 
-- Easy access to the following code actions via the `editor: toggle code actions` menu (`⌘.`/`ctrl+.` shortcut or lightning bolt icon in the gutter):
+- Easy access to the following code actions via the `editor: toggle code actions` menu (`⌘.`/`Ctrl+.` shortcut or lightning bolt icon in the gutter):
   - `Toggle highlight` - Toggle highlighting on and off for the current selection or cursor position.
   - `Clear all highlights` - Remove all active highlights with a single command.
 - Configurable highlight colors (via `settings.json`).
@@ -187,7 +187,7 @@ See Zed's [documentation](https://zed.dev/docs/semantic-tokens#customizing-token
 
 ## Usage
 
-Place the cursor on a word (or select a range of text) and open the code actions menu via `editor: toggle code actions` in the command palette or by pressing the default shortcut `⌘.`/`ctrl+.` (or the lightning bolt icon in the gutter). The following actions are available depending on context:
+Place the cursor on a word (or select a range of text) and open the code actions menu via `editor: toggle code actions` in the command palette or by pressing the default shortcut `⌘.`/`Ctrl+.` (or the lightning bolt icon in the gutter). The following actions are available depending on context:
 
 - `Toggle highlight` - Toggle highlighting on and off for the current selection or cursor position.
 - `Clear all highlights` - Remove all active highlights with a single command.

@@ -27,11 +27,10 @@ cargo install --path lsp
 # and select this repo's directory.
 ```
 
-Three CI workflows live in `.github/workflows/`:
+Two CI workflows live in `.github/workflows/`:
 
-- `build.yml` — runs on every push to `master`: fmt, clippy (warnings-as-errors), test, and build on Linux; test+build on macOS and Windows. Match these locally before pushing.
+- `build.yml` — runs on every push to `master`: fmt, clippy (warnings-as-errors), test, and build on Linux; test+build on macOS and Windows. Zizmor is also run against all workflows. Match these locally before pushing.
 - `release.yml` — triggers on `v*` tags: cross-compiles the LSP binary for all platforms and publishes a GitHub Release with the archives.
-- `publish.yml` — triggers on `v*` tags: opens a PR against `zed-industries/extensions` to bump the extension version in their registry. Requires a `ZED_EXTENSIONS_TOKEN` secret (GitHub PAT with `repo` scope).
 
 ## Lint posture
 
@@ -46,11 +45,11 @@ The workspace `[lints]` table in `Cargo.toml` enables clippy `all`, `pedantic`, 
 
 ### Extension side (`src/lib.rs`)
 
-`HighlightExtension::language_server_command` runs on every LSP launch. It first calls `worktree.which(BINARY_NAME)` so a locally-built `zed-highlight-lsp` on `$PATH` wins over the GitHub-downloaded one. The download path (`install_binary`) is wrapped by `ensure_binary`, which is responsible for reporting `LanguageServerInstallationStatus::Failed` to Zed on error — otherwise the UI gets stuck on `CheckingForUpdate`/`Downloading`. Cached binary directories are versioned (`zed-highlight-lsp-<version>/`) and old ones are pruned on successful install.
+`HighlightExtension::language_server_command` runs on every LSP launch. It first calls `worktree.which(BINARY_NAME)` so a locally-built `zed-highlight-lsp` on `$PATH` wins over the GitHub-downloaded one. The download path (`install_binary`) is wrapped by `ensure_binary`, which is responsible for reporting `LanguageServerInstallationStatus::Failed` to Zed on error — otherwise the UI gets stuck on `CheckingForUpdate`/`Downloading`. Cached binary directories are versioned (`zed-highlight-lsp-<version>/`) and old ones are pruned at every run of `install_binary`.
 
 ### LSP side (`lsp/src/main.rs`)
 
-State model: a single shared `State` (behind `tokio::sync::Mutex`) holds the list of highlighted words and a `HashMap<Url, String>` of full document contents. Highlights are global across all open documents — toggling a word in one file affects all files.
+State model: a single shared `State` (behind `tokio::sync::Mutex`) holds the list of highlighted words, a `HashMap<Url, Arc<str>>` of full document contents, and two matching-mode flags (`whole_word: bool`, `ignore_case: bool`). Highlights are global across all open documents — toggling a word in one file affects all files.
 
 Word slot semantics: `words: Vec<Option<String>>`. Soft-delete leaves `None` in place so existing colors don't shift when a word is removed; new words reuse the first `None` slot before growing the Vec. The visible color index is `slot_index % NUM_COLORS` (8), so a 9th simultaneous highlight reuses color 0.
 
@@ -58,11 +57,11 @@ Refresh model: state changes don't push tokens directly. They call either `immed
 
 Token encoding: `build_tokens` collects absolute `(line, start, length, token_type)` matches, sorts them, then converts to the LSP delta encoding (`delta_start` resets to absolute whenever `delta_line > 0`). Character offsets are in **UTF-16 code units** per the LSP spec — see `utf16_len` and `utf16_to_byte`. Don't accidentally use byte offsets when interacting with `Range`/`Position`.
 
-Matching: words are compiled to a `Regex` via `compile_word_regex`. Default flags are `whole_word = true`, `ignore_case = false`. `whole_word` uses `\b<escaped>\b`, which means a candidate whose first/last char isn't a word char would compile to a never-matching regex — `is_highlightable` filters those out at the code-action layer so they never enter `words` invisibly. `matches_anywhere` checks the current document before exposing the toggle action so we don't offer a no-op.
+Matching: words are compiled to a `Regex` via `compile_word_regex`, which reads `whole_word` and `ignore_case` from `State`. They default to `whole_word = true`, `ignore_case = false`. `whole_word` uses `\b<escaped>\b`, which means a candidate whose first/last char isn't a word char would compile to a never-matching regex — `is_highlightable` filters those out at the code-action layer so they never enter `words` invisibly. `matches_anywhere` checks the current document before exposing the toggle action so we don't offer a no-op.
 
 Word resolution: `word_at` handles two cases — non-empty single-line selection uses the selection verbatim; cursor-only (or multi-line selection) scans `\w`-class chars left/right from the cursor. "Word char" is `is_alphanumeric() || '_'`.
 
-Commands: only two are registered with Zed (`zed-highlight.toggle`, `zed-highlight.clear`). Both are surfaced via `code_action`, not bound to keymaps — users invoke them via `editor: toggle code actions` (`⌘.`).
+Commands: only two are registered with Zed (`zed-highlight.toggle`, `zed-highlight.clear`). Both are surfaced via `code_action`, not bound to keymaps — users invoke them via `editor: toggle code actions` (`⌘.`/`Ctrl+.`).
 
 Code action title: the toggle action always uses the stateless label `Toggle highlight: "<word>"` rather than a state-dependent `Highlight` / `Remove highlight`. Zed caches code action responses by cursor position and only invalidates that cache on cursor movement or document edits — it does not implement `workspace/codeAction/refresh`. A stateless title is always accurate regardless of when Zed last fetched the response, avoiding the confusing mismatch of seeing `Highlight: "foo"` when the word is already highlighted (or vice versa) without the user having moved the cursor. Don't revert this to a state-dependent title without first verifying that Zed has added `workspace/codeAction/refresh` support.
 
@@ -72,4 +71,4 @@ Add it to the `languages = [...]` array in `extension.toml`. The LSP itself is l
 
 ### Configuration surface
 
-The 8 colors are not shipped by the extension — users configure them under `global_lsp_settings.semantic_token_rules` in their Zed `settings.json`, mapping the token type names `zed-highlight-0` through `zed-highlight-7` to colors. `semantic_tokens` must be set to `"combined"` or `"full"` for highlights to appear. Sample dark/light schemes are in `README.md`.
+The 8 colors are not shipped by the extension — users configure them under `global_lsp_settings.semantic_token_rules` in their Zed `settings.json`, mapping the token type names `zed-highlight-0` through `zed-highlight-7` to colors. `semantic_tokens` must be set to `"combined"` or `"full"` for highlights to appear. Sample dark/light schemes are in `README.md`. The dark scheme has been thoroughly tested; the light scheme is a best effort and may need adjustments.
