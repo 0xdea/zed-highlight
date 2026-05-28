@@ -48,7 +48,7 @@ The LSP server is automatically launched by the [Highlight](https://zed.dev/exte
 
 ## Compatibility
 
-The latest release was tested with Zed 1.3.7 (ARM64) on:
+The latest release was tested with Zed 1.4.2 (ARM64) on:
 
 - Apple macOS Tahoe 26.4.1
 - Ubuntu Linux 24.04.3 LTS

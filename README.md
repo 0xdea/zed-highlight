@@ -3,7 +3,7 @@
 [![](https://img.shields.io/github/stars/0xdea/zed-highlight.svg?style=flat&color=yellow)](https://github.com/0xdea/zed-highlight)
 [![](https://img.shields.io/crates/v/zed-highlight-lsp?style=flat&color=green)](https://crates.io/crates/zed-highlight-lsp)
 [![](https://img.shields.io/crates/d/zed-highlight-lsp?style=flat&color=red)](https://crates.io/crates/zed-highlight-lsp)
-[![](https://img.shields.io/badge/zed-1.3.7-violet)](https://zed.dev/extensions/html/highlight)
+[![](https://img.shields.io/badge/zed-1.4.2-violet)](https://zed.dev/extensions/html/highlight)
 [![](https://img.shields.io/badge/twitter-%400xdea-blue.svg)](https://twitter.com/0xdea)
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
 [![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
@@ -31,6 +31,9 @@ The following features are currently supported by the extension and the bundled 
   - `Toggle highlight` - Toggle highlighting on and off for the current selection or cursor position.
   - `Clear all highlights` - Remove all active highlights with a single command.
 - Configurable highlight colors (via `settings.json`).
+- Support for all languages supported by Zed.
+- Cross-platform support for macOS, Linux, and Windows.
+- Automatic installation and updates of the LSP server via the extension.
 
 ## See also
 
@@ -194,7 +197,7 @@ Place the cursor on a word (or select a range of text) and open the code actions
 
 ## Compatibility
 
-The latest release was tested with Zed 1.3.7 (ARM64) on:
+The latest release was tested with Zed 1.4.2 (ARM64) on:
 
 - Apple macOS Tahoe 26.4.1
 - Ubuntu Linux 24.04.3 LTS
