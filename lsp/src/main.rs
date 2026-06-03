@@ -1085,20 +1085,57 @@ mod tests {
     // Test `compile_word_regex`.
 
     #[test]
-    fn compile_word_regex_basic_match() {
-        let re = compile_word_regex("foo", false, false).unwrap();
-        assert!(re.is_match("foo"));
+    fn compile_word_regex_whole_word_and_ignore_case_both_disabled() {
+        let mut re = compile_word_regex("for", false, false).unwrap();
+        assert!(re.is_match("for"), "basic match must work");
+        assert!(
+            re.is_match("format"),
+            "non-whole-word must match when whole-word disabled"
+        );
+
+        re = compile_word_regex("For", false, false).unwrap();
+        assert!(
+            re.is_match("For"),
+            "case-sensitive match must work when ignore_case disabled"
+        );
+        assert!(
+            !re.is_match("for"),
+            "case-sensitive match must work when ignore_case disabled"
+        );
+        assert!(
+            !re.is_match("FOR"),
+            "case-sensitive match must work when ignore_case disabled"
+        );
     }
 
     #[test]
-    fn compile_word_regex_matches_substring_without_whole_word() {
-        let re = compile_word_regex("for", false, false).unwrap();
-        assert!(re.is_match("format"));
+    fn compile_word_regex_case_insensitive_flag_enabled() {
+        let re = compile_word_regex("Foo", false, true).unwrap();
+        assert!(
+            re.is_match("Foo"),
+            "case-insensitive match must work when ignore_case enabled"
+        );
+        assert!(
+            re.is_match("foo"),
+            "case-insensitive match must work when ignore_case enabled"
+        );
+        assert!(
+            re.is_match("FOO"),
+            "case-insensitive match must work when ignore_case enabled"
+        );
     }
 
     #[test]
-    fn compile_word_regex_whole_word_rejects_substring() {
+    fn compile_word_regex_whole_word_flag_enabled() {
         let re = compile_word_regex("for", true, false).unwrap();
+        assert!(
+            re.is_match("for x in y"),
+            "whole-word 'for' must match standalone"
+        );
+        assert!(
+            re.is_match("(for)"),
+            "whole-word 'for' must match when surrounded by non-word chars"
+        );
         assert!(
             !re.is_match("format"),
             "whole-word 'for' must not match inside 'format'"
@@ -1110,50 +1147,66 @@ mod tests {
     }
 
     #[test]
-    fn compile_word_regex_whole_word_matches_standalone() {
-        let re = compile_word_regex("for", true, false).unwrap();
-        assert!(re.is_match("for x in y"));
-        assert!(re.is_match("(for)"));
+    fn compile_word_regex_whole_word_and_ignore_case_both_enabled() {
+        let re = compile_word_regex("Foo", true, true).unwrap();
+        assert!(
+            re.is_match("foo"),
+            "case-insensitive whole-word must match lowercase"
+        );
+        assert!(
+            re.is_match("FOO"),
+            "case-insensitive whole-word must match uppercase"
+        );
+        assert!(
+            !re.is_match("foobar"),
+            "whole-word must not match 'Foo' inside 'foobar'"
+        );
+        assert!(
+            !re.is_match("FOOBAR"),
+            "whole-word must not match 'FOO' inside 'FOOBAR'"
+        );
     }
 
     #[test]
-    fn compile_word_regex_case_sensitive_by_default() {
-        let re = compile_word_regex("Foo", false, false).unwrap();
-        assert!(re.is_match("Foo"));
-        assert!(!re.is_match("foo"));
-        assert!(!re.is_match("FOO"));
-    }
-
-    #[test]
-    fn compile_word_regex_case_insensitive_flag() {
-        let re = compile_word_regex("Foo", false, true).unwrap();
-        assert!(re.is_match("Foo"));
-        assert!(re.is_match("foo"));
-        assert!(re.is_match("FOO"));
-    }
-
-    #[test]
-    fn compile_word_regex_escapes_dot_as_literal() {
-        let re = compile_word_regex("foo.bar", false, false).unwrap();
+    fn compile_word_regex_escapes_special_chars() {
+        let mut re = compile_word_regex("foo.bar", false, false).unwrap();
         assert!(re.is_match("foo.bar"));
         assert!(
             !re.is_match("fooXbar"),
             "dot must match literally, not as any-char"
         );
-    }
 
-    #[test]
-    fn compile_word_regex_escapes_parentheses() {
-        let re = compile_word_regex("foo()", false, false).unwrap();
+        re = compile_word_regex("foo()", false, false).unwrap();
         assert!(re.is_match("foo()"));
         assert!(!re.is_match("foo"), "parentheses are not optional");
-    }
 
-    #[test]
-    fn compile_word_regex_escapes_star() {
-        let re = compile_word_regex("a*b", false, false).unwrap();
+        re = compile_word_regex("a*b", false, false).unwrap();
         assert!(re.is_match("a*b"));
         assert!(!re.is_match("ab"), "star must be literal, not a quantifier");
+
+        re = compile_word_regex("a+b", false, false).unwrap();
+        assert!(re.is_match("a+b"));
+        assert!(!re.is_match("ab"), "plus must be literal, not a quantifier");
+        assert!(
+            !re.is_match("aab"),
+            "plus must be literal, not a quantifier"
+        );
+
+        re = compile_word_regex("a?b", false, false).unwrap();
+        assert!(re.is_match("a?b"));
+        assert!(
+            !re.is_match("ab"),
+            "question mark must be literal, not optional"
+        );
+        assert!(
+            !re.is_match("b"),
+            "question mark must be literal, not optional"
+        );
+
+        re = compile_word_regex("a|b", false, false).unwrap();
+        assert!(re.is_match("a|b"));
+        assert!(!re.is_match("a"), "pipe must be literal, not alternation");
+        assert!(!re.is_match("b"), "pipe must be literal, not alternation");
     }
 
     // Test `matches_anywhere`.
@@ -1202,6 +1255,18 @@ mod tests {
             true,
             false
         ));
+    }
+
+    #[test]
+    fn matches_anywhere_whole_word_and_ignore_case_both_enabled() {
+        assert!(
+            matches_anywhere("let Foo = 1;", "foo", true, true),
+            "'Foo' should match 'foo' with whole_word and ignore_case both enabled"
+        );
+        assert!(
+            !matches_anywhere("Format()", "for", true, true),
+            "'for' should not match inside 'Format' even with ignore_case enabled when whole_word is enabled"
+        );
     }
 
     // Test `word_at`.
@@ -1269,6 +1334,21 @@ mod tests {
     }
 
     #[test]
+    fn word_at_single_char_word() {
+        // "a b" - cursor on 'a' (char 0) -> word "a".
+        assert_eq!(word_at("a b", cursor_range(0, 0)), Some("a".to_owned()));
+    }
+
+    #[test]
+    fn word_at_end_of_string_no_trailing_space() {
+        // "hello" with no trailing space - the right-scan must not overshoot the string end.
+        assert_eq!(
+            word_at("hello", cursor_range(0, 0)),
+            Some("hello".to_owned())
+        );
+    }
+
+    #[test]
     fn word_at_cursor_on_second_line() {
         let content = "first\nsecond line";
         // line 1, char 0 -> 's' in "second".
@@ -1312,6 +1392,13 @@ mod tests {
         let range = make_range(0, 3, 0, 4); // the space in "foo bar"
         assert_eq!(word_at("foo bar", range), None);
     }
+
+    #[test]
+    fn word_at_unicode_alphanumeric_char() {
+        // "café": 'é' (U+00E9) is alphanumeric, so it's a word character. Cursor at UTF-16
+        // offset 3 (on 'é') must return the full word "café".
+        assert_eq!(word_at("café", cursor_range(0, 3)), Some("café".to_owned()));
+    }
 }
 
 /// Integration tests.
@@ -1327,6 +1414,9 @@ mod integration {
 
     /// Stable document URI reused by all tests; the service is fresh per test so there's no cross-test state.
     const URI: &str = "file:///test.txt";
+
+    /// A second stable document URI for multi-document tests.
+    const URI2: &str = "file:///test2.txt";
 
     // Helper functions.
 
@@ -1484,6 +1574,44 @@ mod integration {
                     "range": {
                         "start": { "line": line, "character": character },
                         "end":   { "line": line, "character": character }
+                    },
+                    "context": { "diagnostics": [] }
+                }
+            }),
+        )
+        .await
+        .unwrap();
+        res["result"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v["title"].as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Request code actions for a given selection range and return their titles in order.
+    async fn code_action_range(
+        svc: &mut Svc,
+        id: u32,
+        uri: &str,
+        start_line: u32,
+        start_char: u32,
+        end_line: u32,
+        end_char: u32,
+    ) -> Vec<String> {
+        let res = call_inner(
+            svc,
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "method": "textDocument/codeAction",
+                "params": {
+                    "textDocument": { "uri": uri },
+                    "range": {
+                        "start": { "line": start_line, "character": start_char },
+                        "end":   { "line": end_line,   "character": end_char }
                     },
                     "context": { "diagnostics": [] }
                 }
@@ -1735,6 +1863,154 @@ mod integration {
             data,
             [0, 3, 3, 0, 0],
             "delta_start must be UTF-16 offset (3), not byte offset (7)"
+        );
+    }
+
+    /// Cursor on a space (non-word character) must produce no code actions when no words are highlighted.
+    #[tokio::test]
+    async fn code_action_no_actions_when_cursor_on_space() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "foo bar").await;
+        // Character 3 is the space between "foo" and "bar".
+        let actions = code_action(&mut svc, 1, URI, 0, 3).await;
+        assert!(actions.is_empty(), "no actions when cursor is on a space");
+    }
+
+    /// The "Clear all highlights" action must not appear when no words are currently highlighted.
+    #[tokio::test]
+    async fn code_action_no_clear_action_when_no_highlights() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "foo").await;
+        let actions = code_action(&mut svc, 1, URI, 0, 0).await;
+        assert!(
+            actions.iter().any(|a| a.contains("Toggle highlight")),
+            "toggle action must be present when cursor is on a valid word"
+        );
+        assert!(
+            !actions.iter().any(|a| a.contains("Clear")),
+            "clear action must not appear when no words are highlighted"
+        );
+    }
+
+    /// After toggling a word on, both the toggle and clear actions must be offered together.
+    #[tokio::test]
+    async fn code_action_both_actions_when_word_highlighted() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "foo bar").await;
+        toggle(&mut svc, 1, "foo").await;
+        let actions = code_action(&mut svc, 2, URI, 0, 0).await;
+        assert!(
+            actions.iter().any(|a| a.contains("Toggle highlight")),
+            "toggle action must be present"
+        );
+        assert!(
+            actions.iter().any(|a| a.contains("Clear")),
+            "clear action must appear when at least one word is highlighted"
+        );
+    }
+
+    /// In whole-word mode (the default), toggling a word that starts or ends with a non-word character
+    /// must be a no-op: `is_highlightable` rejects it, the words list must not change, and no tokens
+    /// must be produced.
+    #[tokio::test]
+    async fn toggle_non_highlightable_word_is_no_op() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "foo . bar").await;
+        // "." starts and ends with a non-word character — `is_highlightable(".", true)` is false.
+        toggle(&mut svc, 1, ".").await;
+        let data = get_tokens(&mut svc, 2, URI).await;
+        assert!(
+            data.is_empty(),
+            "toggling a non-highlightable word must not add it to the highlight list"
+        );
+    }
+
+    /// After a word is removed, the next new word reuses the freed slot and therefore inherits its
+    /// color index rather than being appended at the end with a new index.
+    #[tokio::test]
+    async fn tokens_color_reuse_after_remove() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "baz bar").await;
+        toggle(&mut svc, 1, "foo").await; // slot 0 = Some("foo"), color 0
+        toggle(&mut svc, 2, "bar").await; // slot 1 = Some("bar"), color 1
+        toggle(&mut svc, 3, "foo").await; // slot 0 = None (soft-delete)
+        toggle(&mut svc, 4, "baz").await; // slot 0 = Some("baz"), reuses color 0
+        let data = get_tokens(&mut svc, 5, URI).await;
+        let decoded = decode_tokens(&data);
+        assert_eq!(
+            decoded,
+            [(0, 0, 3, 0), (0, 4, 3, 1)],
+            "baz must reuse slot 0 (color 0) after foo was removed; bar must keep slot 1 (color 1)"
+        );
+    }
+
+    /// Highlights are global across all open documents: toggling a word must produce tokens in every
+    /// document that contains it, not only the one where the action was invoked.
+    #[tokio::test]
+    async fn tokens_multiple_documents() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "hello world").await;
+        open(&mut svc, URI2, "hello there").await;
+        toggle(&mut svc, 1, "hello").await;
+        let data1 = get_tokens(&mut svc, 2, URI).await;
+        let data2 = get_tokens(&mut svc, 3, URI2).await;
+        assert!(
+            !data1.is_empty(),
+            "first document must have a token for 'hello'"
+        );
+        assert!(
+            !data2.is_empty(),
+            "second document must have a token for 'hello'"
+        );
+        assert_eq!(data1[3], 0, "token type in first document must be 0");
+        assert_eq!(data2[3], 0, "token type in second document must be 0");
+    }
+
+    /// An empty document must produce no tokens even when words are highlighted.
+    #[tokio::test]
+    async fn tokens_empty_document_returns_no_tokens() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "").await;
+        toggle(&mut svc, 1, "foo").await;
+        let data = get_tokens(&mut svc, 2, URI).await;
+        assert!(
+            data.is_empty(),
+            "empty document must produce no tokens even if words are highlighted"
+        );
+    }
+
+    /// Emoji (U+1F600) occupy two UTF-16 code units (a surrogate pair). A token following an emoji
+    /// must report the correct UTF-16 `delta_start`, not the byte offset.
+    #[tokio::test]
+    async fn tokens_surrogate_pair_utf16_offset() {
+        let mut svc = make_service().await;
+        // '😀' is U+1F600: 4 UTF-8 bytes but 2 UTF-16 code units.
+        // "foo" therefore starts at UTF-16 offset 2, not byte offset 4.
+        open(&mut svc, URI, "😀foo").await;
+        toggle(&mut svc, 1, "foo").await;
+        let data = get_tokens(&mut svc, 2, URI).await;
+        assert_eq!(
+            data,
+            [0, 2, 3, 0, 0],
+            "delta_start must be UTF-16 offset (2), not byte offset (4)"
+        );
+    }
+
+    /// A non-empty single-line selection must be used verbatim as the highlight target, bypassing the
+    /// cursor-to-word-boundary scan. This matters for selections that include non-word characters such
+    /// as dots that the cursor scan would not span.
+    #[tokio::test]
+    async fn code_action_selection_uses_selected_text() {
+        let mut svc = make_service().await;
+        // "foo.bar" selected in full (chars 0..7). The dot makes the cursor scan stop at "foo",
+        // but the selection path must return the full selected text.
+        open(&mut svc, URI, "foo.bar").await;
+        let actions = code_action_range(&mut svc, 1, URI, 0, 0, 0, 7).await;
+        assert!(
+            actions
+                .iter()
+                .any(|a| a == r#"Toggle highlight: "foo.bar""#),
+            "selection must yield a toggle action for the full selected text; got: {actions:?}"
         );
     }
 }
