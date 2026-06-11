@@ -21,14 +21,14 @@ struct HighlightExtension {
 }
 
 impl zed::Extension for HighlightExtension {
-    /// Construct a new instance of the extension.
+    /// Constructs a new instance of the extension.
     fn new() -> Self {
         Self {
             cached_binary_path: None,
         }
     }
 
-    /// Return the command used to start the language server for the specified language.
+    /// Returns the command used to start the language server for the specified language.
     ///
     /// ## Errors
     ///
@@ -58,9 +58,9 @@ impl zed::Extension for HighlightExtension {
 }
 
 impl HighlightExtension {
-    /// Ensure the language server binary is available and return its path. If the binary is not already cached and
-    /// valid, check GitHub for the latest release, download the appropriate prebuilt binary for the current platform,
-    /// and cache its path for future use.
+    /// Ensures the language server binary is available and returns its path. If the binary is not already cached and
+    /// valid, checks GitHub for the latest release, downloads the appropriate prebuilt binary for the current platform,
+    /// and caches its path for future use.
     ///
     /// ## Errors
     ///
@@ -98,7 +98,7 @@ impl HighlightExtension {
         }
     }
 
-    /// Perform the actual install steps (fetch release metadata, download and extract the latest release archive,
+    /// Performs the actual install steps (fetch release metadata, download and extract the latest release archive,
     /// and make the binary executable). Errors bubble up to [`HighlightExtension::ensure_binary`], which is
     /// responsible for reporting [`zed::LanguageServerInstallationStatus::Failed`] to the UI.
     ///
@@ -225,7 +225,7 @@ fn binary_path_in_version(version: &str, os: zed::Os) -> String {
     format!("{}/{}", version_dir_name(version), binary_file_name(os))
 }
 
-/// Register as a Zed extension.
+/// Registers as a Zed extension.
 mod register {
     // The `register_extension!` macro expands to `pub` glue items that the WASM host imports by name.
     // Wrapping the call in a module prevents the `missing_docs` lint from firing.

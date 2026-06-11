@@ -80,7 +80,7 @@ struct State {
 }
 
 impl State {
-    /// Construct a new instance of the server's internal state.
+    /// Constructs a new instance of the server's internal state.
     ///
     /// By default, [`State::whole_word`] matching is set to true, while the [`State::ignore_case`] flag defaults to
     /// false. This should be a sensible default behavior, and we can consider making these flags configurable later.
@@ -93,7 +93,7 @@ impl State {
         }
     }
 
-    /// Toggle a word in/out of the highlight list.
+    /// Toggles a word in/out of the highlight list.
     ///
     /// Three cases:
     /// 1. Word is already in the list: soft-delete it preserving the slot (set its slot to `None`).
@@ -116,12 +116,12 @@ impl State {
         }
     }
 
-    /// Check whether at least one word is currently highlighted.
+    /// Checks whether at least one word is currently highlighted.
     fn has_any(&self) -> bool {
         self.words.iter().any(Option::is_some)
     }
 
-    /// Clear all highlighted words.
+    /// Clears all highlighted words.
     fn words_clear(&mut self) {
         self.words.clear();
     }
@@ -154,7 +154,7 @@ struct Backend {
 }
 
 impl Backend {
-    /// Construct a new instance of the server's backend given a [`Client`].
+    /// Constructs a new instance of the server's backend given a [`Client`].
     fn new(client: Client) -> Self {
         Self {
             client,
@@ -163,7 +163,7 @@ impl Backend {
         }
     }
 
-    /// Cancel any pending debounced refresh and send a `workspace/semanticTokens/refresh` request to Zed right now.
+    /// Cancels any pending debounced refresh and sends a `workspace/semanticTokens/refresh` request to Zed right now.
     /// Used after user-driven actions (toggle/clear) where we want the highlight change to appear without delay.
     ///
     /// Zed does not implement `workspace/codeAction/refresh`, so it cannot be signalled to re-fetch code actions
@@ -184,7 +184,7 @@ impl Backend {
         let _ = self.client.semantic_tokens_refresh().await;
     }
 
-    /// Schedule a `workspace/semanticTokens/refresh` request after a short idle delay, cancelling any previously
+    /// Schedules a `workspace/semanticTokens/refresh` request after a short idle delay, cancelling any previously
     /// scheduled one. Classic debounce pattern: rapid events (keystrokes) keep resetting the timer; the refresh only
     /// fires once the user pauses.
     #[expect(
@@ -207,7 +207,7 @@ impl Backend {
         }));
     }
 
-    /// Build the full list of [`SemanticTokens`] for a document.
+    /// Builds the full list of [`SemanticTokens`] for a document.
     ///
     /// The LSP semantic tokens protocol requires tokens to be encoded as a flat array of [`SemanticToken`] 5-tuples in
     /// document order, where each position is expressed as a delta from the previous token (not an absolute position).
@@ -1420,7 +1420,7 @@ mod integration {
 
     // Helper functions.
 
-    /// Serialize `req` as a JSON-RPC request, drive it through the service, and return the serialized response.
+    /// Serializes `req` as a JSON-RPC request, drives it through the service, and returns the serialized response.
     /// Notifications (no `id` field) produce `None`; requests produce `Some(response_json)`.
     async fn call_inner(svc: &mut Svc, req: serde_json::Value) -> Option<serde_json::Value> {
         let req: tower_lsp::jsonrpc::Request = serde_json::from_value(req).unwrap();
@@ -1428,7 +1428,7 @@ mod integration {
         res.map(|r| serde_json::to_value(r).unwrap())
     }
 
-    /// Create a fresh service and complete the mandatory LSP handshake (`initialize` -> `initialized`).
+    /// Creates a fresh service and completes the mandatory LSP handshake (`initialize` -> `initialized`).
     /// The `ClientSocket` (used for server-to-client notifications) is dropped immediately; the backend
     /// ignores send errors with `let _ =`, so this is safe and avoids keeping a handle we don't need.
     async fn make_service() -> Svc {
@@ -1460,7 +1460,7 @@ mod integration {
         svc
     }
 
-    /// Register a document via `textDocument/didOpen` so it's available in `state.docs`.
+    /// Registers a document via `textDocument/didOpen` so it's available in `state.docs`.
     async fn open(svc: &mut Svc, uri: &str, text: &str) {
         drop(
             call_inner(
@@ -1482,7 +1482,7 @@ mod integration {
         );
     }
 
-    /// Replace a document's full text via `textDocument/didChange` (FULL sync: one change, no range).
+    /// Replaces a document's full text via `textDocument/didChange` (FULL sync: one change, no range).
     async fn change(svc: &mut Svc, uri: &str, text: &str) {
         drop(
             call_inner(
@@ -1500,7 +1500,7 @@ mod integration {
         );
     }
 
-    /// Evict a document from `state.docs` via `textDocument/didClose`.
+    /// Evicts a document from `state.docs` via `textDocument/didClose`.
     async fn close(svc: &mut Svc, uri: &str) {
         drop(
             call_inner(
@@ -1517,8 +1517,8 @@ mod integration {
         );
     }
 
-    /// Toggle a word on/off via `workspace/executeCommand` -> `zed-highlight.toggle`.
-    /// `id` must be unique per test to satisfy the JSON-RPC request/response pairing.
+    /// Toggles a word on/off via `workspace/executeCommand` -> `zed-highlight.toggle`.
+    /// (`id` must be unique per test to satisfy the JSON-RPC request/response pairing).
     async fn toggle(svc: &mut Svc, id: u32, word: &str) {
         drop(
             call_inner(
@@ -1537,7 +1537,7 @@ mod integration {
         );
     }
 
-    /// Remove all highlighted words via `workspace/executeCommand` -> `zed-highlight.clear`.
+    /// Removes all highlighted words via `workspace/executeCommand` -> `zed-highlight.clear`.
     async fn clear(svc: &mut Svc, id: u32) {
         drop(
             call_inner(
@@ -1555,7 +1555,7 @@ mod integration {
         );
     }
 
-    /// Request code actions at the given cursor position and return their titles in order.
+    /// Requests code actions at the given cursor position and returns their titles in order.
     async fn code_action(
         svc: &mut Svc,
         id: u32,
@@ -1591,7 +1591,7 @@ mod integration {
             .unwrap_or_default()
     }
 
-    /// Request code actions for a given selection range and return their titles in order.
+    /// Requests code actions for a given selection range and returns their titles in order.
     async fn code_action_range(
         svc: &mut Svc,
         id: u32,
@@ -1629,8 +1629,8 @@ mod integration {
             .unwrap_or_default()
     }
 
-    /// Request the full semantic token list for a document and return the raw flat `data` array. Each token is encoded
-    /// as 5 consecutive u32s: `delta_line`, `delta_start`, `length`, `token_type`, `token_modifiers`.
+    /// Requests the full semantic token list for a document and returns the raw flat `data` array. Each token is
+    /// encoded as 5 consecutive u32s: `delta_line`, `delta_start`, `length`, `token_type`, `token_modifiers`.
     async fn get_tokens(svc: &mut Svc, id: u32, uri: &str) -> Vec<u32> {
         let res = call_inner(
             svc,
@@ -1653,7 +1653,7 @@ mod integration {
             .collect()
     }
 
-    /// Convert the flat token array into (`delta_line`, `delta_start`, `length`, `token_type`) 4-tuples,
+    /// Converts the flat token array into (`delta_line`, `delta_start`, `length`, `token_type`) 4-tuples,
     /// dropping the always-zero `token_modifiers_bitset` field.
     fn decode_tokens(data: &[u32]) -> Vec<(u32, u32, u32, u32)> {
         data.chunks_exact(5)
