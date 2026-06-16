@@ -30,7 +30,7 @@ const DEBOUNCE_DELAY_MS: u64 = 250;
 /// These names are arbitrary strings that the LSP advertises as its semantic token type legend. Zed looks them up in
 /// `global_lsp_settings.semantic_token_rules` (settings.json file) to map each name to a foreground/background color.
 ///
-/// ## Examples
+/// # Examples
 ///
 /// `global_lsp_settings` snippet for the dark theme (8 highlight colors with 50% opacity backgrounds):
 /// ```json

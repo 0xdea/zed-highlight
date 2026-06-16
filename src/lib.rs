@@ -30,7 +30,7 @@ impl zed::Extension for HighlightExtension {
 
     /// Returns the command used to start the language server for the specified language.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// Returns an error if the language server binary cannot be found locally or downloaded.
     fn language_server_command(
@@ -62,7 +62,7 @@ impl HighlightExtension {
     /// valid, checks GitHub for the latest release, downloads the appropriate prebuilt binary for the current platform,
     /// and caches its path for future use.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// Returns an error if any step of the install process fails as reported by [`HighlightExtension::install_binary`].
     fn ensure_binary(&mut self, language_server_id: &LanguageServerId) -> Result<String> {
@@ -99,15 +99,17 @@ impl HighlightExtension {
     }
 
     /// Performs the actual install steps (fetch release metadata, download and extract the latest release archive,
-    /// and make the binary executable). Errors bubble up to [`HighlightExtension::ensure_binary`], which is
-    /// responsible for reporting [`zed::LanguageServerInstallationStatus::Failed`] to the UI.
+    /// and make the binary executable) and returns the binary path.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// Returns an error if:
     /// - The latest release cannot be fetched from GitHub.
     /// - No suitable prebuilt binary asset is found for the current platform.
     /// - The binary fails to download, extract, or be made executable.
+    ///
+    /// Errors bubble up to [`HighlightExtension::ensure_binary`], which is responsible for reporting
+    /// [`zed::LanguageServerInstallationStatus::Failed`] to the UI.
     fn install_binary(language_server_id: &LanguageServerId) -> Result<String> {
         // Tell Zed we are checking for an update.
         zed::set_language_server_installation_status(
