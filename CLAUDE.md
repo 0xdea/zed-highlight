@@ -40,6 +40,9 @@ The workspace `[lints]` table in `Cargo.toml` enables clippy `all`, `pedantic`, 
 - Don't add `unwrap()`, `expect()`, `panic!`, `todo!`, `unreachable!`, or `dbg!` — clippy will fail CI.
 - When suppressing a lint, prefer `#[expect(..., reason = "...")]` over `#[allow(...)]` and always include a reason (`allow_attributes_without_reason` is on).
 - Errors that must be ignored should be matched explicitly (e.g. `let _ = ...`) only with an `#[expect(clippy::let_underscore_must_use, reason = "...")]` block.
+- `pattern_type_mismatch` is on — Rust's implicit match ergonomics are forbidden. When iterating `&Option<T>` or a closure receives `&(A, B)`, make the reference explicit on the expression side: use `.as_deref()` / `.as_ref()` for `Option` patterns, and `&(_, c)` for tuple destructuring in closures.
+- `ref_patterns` is on — don't write `ref x` in patterns. Use `.as_ref()` or `.as_deref()` on the expression side instead so the pattern binds a plain reference without the `ref` keyword.
+- `if_then_some_else_none` is on — replace `if cond { Some(v) } else { None }` with `.then_some(v)` (when `v` is cheap/trivial) or `.then(|| v)` (when `v` allocates or has side effects).
 
 ## Architecture notes
 

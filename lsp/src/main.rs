@@ -1,10 +1,12 @@
-#![doc = include_str!("../README.md")]
+#![doc = env!("CARGO_PKG_DESCRIPTION")]
+#![doc = ""]
+#![cfg_attr(doc, doc = include_str!("../README.md"))]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/logo.png"
 )]
 #![allow(
     clippy::wildcard_imports,
-    reason = "Implicit import of all LSP types is more convenient than listing them one by one."
+    reason = "implicit import of all LSP types is more convenient than listing them one by one"
 )]
 
 use std::collections::HashMap;
@@ -14,6 +16,7 @@ use std::time::Duration;
 
 use regex::{Regex, RegexBuilder};
 use tokio::sync::Mutex;
+use tokio::{io, task, time};
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
@@ -150,7 +153,7 @@ struct Backend {
     state: Arc<Mutex<State>>,
 
     /// Handle to the currently pending debounced refresh task, if any.
-    refresh_handle: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    refresh_handle: Mutex<Option<task::JoinHandle<()>>>,
 }
 
 impl Backend {
@@ -169,10 +172,6 @@ impl Backend {
     /// Zed does not implement `workspace/codeAction/refresh`, so it cannot be signalled to re-fetch code actions
     /// after a state change. The code action titles are therefore kept stateless (see [`Backend::code_action`])
     /// so that Zed's cached response remains accurate regardless of the direction of the last toggle.
-    #[expect(
-        clippy::let_underscore_must_use,
-        reason = "Errors from the refresh request are intentionally ignored."
-    )]
     async fn immediate_refresh(&self) {
         // Cancel any pending debounced refresh.
         let refresh_handle = self.refresh_handle.lock().await.take();
@@ -181,16 +180,12 @@ impl Backend {
         }
 
         // Send the refresh request to Zed, ignoring any errors.
-        let _ = self.client.semantic_tokens_refresh().await;
+        _ = self.client.semantic_tokens_refresh().await;
     }
 
     /// Schedules a `workspace/semanticTokens/refresh` request after a short idle delay, cancelling any previously
     /// scheduled one. Classic debounce pattern: rapid events (keystrokes) keep resetting the timer; the refresh only
     /// fires once the user pauses.
-    #[expect(
-        clippy::let_underscore_must_use,
-        reason = "Errors from the refresh request are intentionally ignored."
-    )]
     async fn debounced_refresh(&self) {
         let mut guard = self.refresh_handle.lock().await;
 
@@ -202,8 +197,8 @@ impl Backend {
         // Schedule a new debounced refresh request.
         let client = self.client.clone();
         *guard = Some(tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(DEBOUNCE_DELAY_MS)).await;
-            let _ = client.semantic_tokens_refresh().await;
+            time::sleep(Duration::from_millis(DEBOUNCE_DELAY_MS)).await;
+            _ = client.semantic_tokens_refresh().await;
         }));
     }
 
@@ -216,7 +211,19 @@ impl Backend {
     /// Character offsets must be in UTF-16 code units because that is what the LSP spec mandates.
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "UTF-16 code unit count should fit in u32 for any reasonable line length."
+        reason = "UTF-16 code unit count should fit in u32 for any reasonable line length"
+    )]
+    #[expect(
+        clippy::integer_division_remainder_used,
+        reason = "the modulo operation is needed here"
+    )]
+    #[expect(
+        clippy::as_conversions,
+        reason = "the `as` conversion is safe here because of the modulo operation"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "subtractions should be safe here"
     )]
     async fn build_tokens(&self, uri: &Url) -> Vec<SemanticToken> {
         // Snapshot the state and release the lock.
@@ -238,7 +245,7 @@ impl Backend {
         let mut raw: Vec<(u32, u32, u32, u32)> = Vec::new();
 
         for (color_idx, opt) in words.iter().enumerate() {
-            let word = match opt {
+            let word = match opt.as_deref() {
                 Some(w) if !w.is_empty() => w,
                 // Skip `None` (soft-deleted) and empty-string slots.
                 _ => continue,
@@ -305,6 +312,10 @@ impl Backend {
 /// request/notification we want to handle. The [`Backend`] struct holds the shared state and client handle, and we
 /// dispatch to helper methods for the main logic.
 #[tower_lsp::async_trait]
+#[expect(
+    clippy::missing_trait_methods,
+    reason = "we need only a subset of the trait methods"
+)]
 impl LanguageServer for Backend {
     /// Called once at server startup. We respond with our capabilities so Zed knows which features we support.
     async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
@@ -455,7 +466,7 @@ impl LanguageServer for Backend {
         // Snapshot the state.
         let state = self.state.lock().await;
         let content = match state.docs.get(&params.text_document.uri) {
-            Some(c) => c.clone(),
+            Some(c) => Arc::clone(c),
             None => return Ok(None),
         };
         let has_any = state.has_any();
@@ -472,7 +483,7 @@ impl LanguageServer for Backend {
         let mut actions: Vec<CodeActionOrCommand> = Vec::new();
 
         // Highlight toggle action for the current word, if any.
-        if let Some(ref w) = word {
+        if let Some(w) = word.as_ref() {
             actions.push(CodeActionOrCommand::CodeAction(CodeAction {
                 title: format!("Toggle highlight: \"{w}\""),
                 kind: Some(CodeActionKind::EMPTY),
@@ -555,13 +566,21 @@ impl LanguageServer for Backend {
 /// Helper function to count the number of UTF-16 code units in a UTF-8 string slice.
 #[expect(
     clippy::cast_possible_truncation,
-    reason = "UTF-16 code unit count should fit in u32 for any reasonable line length."
+    reason = "UTF-16 code unit count should fit in u32 for any reasonable line length"
+)]
+#[expect(
+    clippy::as_conversions,
+    reason = "the `as` conversion is reasonably safe here because we are operating on strings"
 )]
 fn utf16_len(s: &str) -> u32 {
     s.chars().map(|c| c.len_utf16() as u32).sum()
 }
 
 /// Helper function to convert a UTF-16 character offset to a byte offset within `s`.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "`count` cannot reasonably overflow here"
+)]
 fn utf16_to_byte(s: &str, utf16_offset: usize) -> Option<usize> {
     let mut count = 0;
     for (i, c) in s.char_indices() {
@@ -571,13 +590,8 @@ fn utf16_to_byte(s: &str, utf16_offset: usize) -> Option<usize> {
         }
         count += c.len_utf16();
     }
-    // Handle the case where the offset points exactly at the end of the string.
-    if count == utf16_offset {
-        Some(s.len())
-    // Offset is past the end (shouldn't happen with valid LSP data).
-    } else {
-        None
-    }
+    // Returns `None` if the offset is past the end of the string (shouldn't happen with valid LSP data).
+    (count == utf16_offset).then_some(s.len())
 }
 
 /// Helper function to return the word the user is acting on, given the cursor range from a code action request.
@@ -588,6 +602,14 @@ fn utf16_to_byte(s: &str, utf16_offset: usize) -> Option<usize> {
 ///
 /// "Word characters" are alphanumerics plus underscore, matching `\w` in most regex flavors and covering the common
 /// case of identifiers in source code.
+#[expect(
+    clippy::as_conversions,
+    reason = "the `as` conversion from `u32` to `usize` is safe"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "`end` cannot reasonably overflow here"
+)]
 fn word_at(content: &str, range: Range) -> Option<String> {
     // Get the line where the cursor is. If the line is missing (shouldn't happen with valid LSP data), return None.
     let line = content.lines().nth(range.start.line as usize)?;
@@ -616,7 +638,7 @@ fn word_at(content: &str, range: Range) -> Option<String> {
     let start = line[..byte_pos]
         .char_indices()
         .rev()
-        .take_while(|(_, c)| is_word_char(*c))
+        .take_while(|&(_, c)| is_word_char(c))
         .last()
         .map_or(byte_pos, |(i, _)| i);
 
@@ -624,15 +646,11 @@ fn word_at(content: &str, range: Range) -> Option<String> {
     let end = byte_pos
         + line[byte_pos..]
             .char_indices()
-            .take_while(|(_, c)| is_word_char(*c))
+            .take_while(|&(_, c)| is_word_char(c))
             .last()
             .map_or(0, |(i, c)| i + c.len_utf8());
 
-    if start < end {
-        Some(line[start..end].to_string())
-    } else {
-        None
-    }
+    (start < end).then(|| line[start..end].to_string())
 }
 
 /// Helper function to check if a character is a "word character" for the purposes of determining word boundaries.
@@ -698,15 +716,19 @@ fn compile_word_regex(word: &str, whole_word: bool, ignore_case: bool) -> Option
 /// restarts the language server).
 #[tokio::main]
 async fn main() {
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
+    let stdin = io::stdin();
+    let stdout = io::stdout();
     let (service, socket) = LspService::new(Backend::new);
     Server::new(stdin, stdout, socket).serve(service).await;
 }
 
 /// Unit tests.
-#[expect(clippy::unwrap_used, reason = "tests can use `unwrap`")]
 #[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "tests can use `unwrap`")]
+#[expect(
+    clippy::non_ascii_literal,
+    reason = "test data contains non-ASCII characters"
+)]
 mod tests {
     use super::*;
 
@@ -1402,10 +1424,15 @@ mod tests {
 }
 
 /// Integration tests.
-#[expect(clippy::unwrap_used, reason = "tests can use `unwrap`")]
 #[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "tests can use `unwrap`")]
+#[expect(
+    clippy::non_ascii_literal,
+    reason = "test data contains non-ASCII characters"
+)]
 mod integration {
     use tower::{Service as _, ServiceExt as _};
+    use tower_lsp::jsonrpc;
 
     use super::*;
 
@@ -1422,8 +1449,9 @@ mod integration {
 
     /// Serializes `req` as a JSON-RPC request, drives it through the service, and returns the serialized response.
     /// Notifications (no `id` field) produce `None`; requests produce `Some(response_json)`.
+    #[expect(clippy::shadow_reuse, reason = "shadowing is convenient here")]
     async fn call_inner(svc: &mut Svc, req: serde_json::Value) -> Option<serde_json::Value> {
-        let req: tower_lsp::jsonrpc::Request = serde_json::from_value(req).unwrap();
+        let req: jsonrpc::Request = serde_json::from_value(req).unwrap();
         let res = svc.ready().await.unwrap().call(req).await.unwrap();
         res.map(|r| serde_json::to_value(r).unwrap())
     }
@@ -1438,7 +1466,7 @@ mod integration {
                 &mut svc,
                 serde_json::json!({
                     "jsonrpc": "2.0",
-                    "id": 0,
+                    "id": 0_i32,
                     "method": "initialize",
                     "params": { "capabilities": {} }
                 }),
@@ -1472,7 +1500,7 @@ mod integration {
                         "textDocument": {
                             "uri": uri,
                             "languageId": "plaintext",
-                            "version": 1,
+                            "version": 1_i32,
                             "text": text
                         }
                     }
@@ -1491,7 +1519,7 @@ mod integration {
                     "jsonrpc": "2.0",
                     "method": "textDocument/didChange",
                     "params": {
-                        "textDocument": { "uri": uri, "version": 2 },
+                        "textDocument": { "uri": uri, "version": 2_i32 },
                         "contentChanges": [{ "text": text }]
                     }
                 }),
@@ -1655,6 +1683,10 @@ mod integration {
 
     /// Converts the flat token array into (`delta_line`, `delta_start`, `length`, `token_type`) 4-tuples,
     /// dropping the always-zero `token_modifiers_bitset` field.
+    #[expect(
+        clippy::missing_asserts_for_indexing,
+        reason = "this negligible performance hit is not important in tests"
+    )]
     fn decode_tokens(data: &[u32]) -> Vec<(u32, u32, u32, u32)> {
         data.chunks_exact(5)
             .map(|c| (c[0], c[1], c[2], c[3]))

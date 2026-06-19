@@ -1,4 +1,6 @@
-#![doc = include_str!("../README.md")]
+#![doc = env!("CARGO_PKG_DESCRIPTION")]
+#![doc = ""]
+#![cfg_attr(doc, doc = include_str!("../README.md"))]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/logo.png"
 )]
@@ -20,6 +22,10 @@ struct HighlightExtension {
     cached_binary_path: Option<String>,
 }
 
+#[expect(
+    clippy::missing_trait_methods,
+    reason = "we need only a subset of the trait methods"
+)]
 impl zed::Extension for HighlightExtension {
     /// Constructs a new instance of the extension.
     fn new() -> Self {
@@ -67,7 +73,7 @@ impl HighlightExtension {
     /// Returns an error if any step of the install process fails as reported by [`HighlightExtension::install_binary`].
     fn ensure_binary(&mut self, language_server_id: &LanguageServerId) -> Result<String> {
         // Immediately return the cached path if the file still exists on disk.
-        if let Some(ref path) = self.cached_binary_path
+        if let Some(path) = self.cached_binary_path.as_ref()
             && fs::metadata(path).is_ok_and(|m| m.is_file())
         {
             return Ok(path.clone());
@@ -171,14 +177,10 @@ impl HighlightExtension {
 
         // Remove any other directories to avoid unbounded disk growth. Runs unconditionally so that we self-heal when a
         // previous install succeeded but the prune step failed or was interrupted on an earlier run.
-        #[expect(
-            clippy::let_underscore_must_use,
-            reason = "Errors here are non-fatal and can be safely ignored."
-        )]
         if let Ok(entries) = fs::read_dir(".") {
             for entry in entries.flatten() {
                 if entry.file_name().to_str() != Some(&version_dir) {
-                    let _ = fs::remove_dir_all(entry.path());
+                    _ = fs::remove_dir_all(entry.path());
                 }
             }
         }
@@ -191,6 +193,7 @@ impl HighlightExtension {
 ///
 /// Asset names follow the pattern `{BINARY_NAME}-{os}-{arch}.tar.gz` and are
 /// matched against GitHub Release asset names during installation.
+#[expect(clippy::shadow_reuse, reason = "shadowing is convenient here")]
 fn platform_asset_name(os: zed::Os, arch: zed::Architecture) -> String {
     let os = match os {
         zed::Os::Mac => "darwin",
