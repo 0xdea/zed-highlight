@@ -1,6 +1,6 @@
 id = "word-highlight"
 name = "Word Highlight"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Marco Ivaldi <raptor@0xdeadbeef.info>"]
 description = "Highlight all occurrences of selected words with multiple colors to quickly identify them in code."
 repository = "https://github.com/0xdea/zed-highlight"
