@@ -3,7 +3,7 @@
 [![](https://img.shields.io/github/stars/0xdea/zed-highlight.svg?style=flat&color=yellow)](https://github.com/0xdea/zed-highlight)
 [![](https://img.shields.io/crates/v/zed-highlight-lsp?style=flat&color=green)](https://crates.io/crates/zed-highlight-lsp)
 [![](https://img.shields.io/crates/d/zed-highlight-lsp?style=flat&color=red)](https://crates.io/crates/zed-highlight-lsp)
-[![](https://img.shields.io/badge/zed-1.4.2-violet)](https://zed.dev/extensions/html/highlight)
+[![](https://img.shields.io/badge/zed-1.7.2-violet)](https://zed.dev/extensions/html/word-highlight)
 [![](https://img.shields.io/badge/twitter-%400xdea-blue.svg)](https://twitter.com/0xdea)
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
 [![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
@@ -13,7 +13,7 @@
 >
 > -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
 
-[Highlight](https://zed.dev/extensions/html/highlight) is a language extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
+[Word Highlight](https://zed.dev/extensions/html/word-highlight) is a language extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
@@ -44,7 +44,7 @@ The following features are currently supported by the extension and the bundled 
 
 ## Installing
 
-The easiest way to install the Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/highlight). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically on first use and will check for updates upon startup.
+The easiest way to install the Word Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/word-highlight). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically on first use and will check for updates upon startup.
 
 Alternatively, you can clone the repository and install both the extension and the LSP server manually. First, build the LSP server from source and install it:
 
@@ -57,7 +57,7 @@ cargo install --path lsp
 Then, in Zed, run `zed: install dev extension` from the command palette and select the `zed-highlight` directory in which you have previously cloned the repository.
 
 > [!NOTE]
-> Highlight LSP is also available on [crates.io](https://crates.io/crates/zed-highlight-lsp).
+> Zed Highlight LSP is also available on [crates.io](https://crates.io/crates/zed-highlight-lsp).
 > You can install it directly via `cargo install zed-highlight-lsp` if you don't want to build from source.
 
 ## Configuration
@@ -84,7 +84,7 @@ Then, configure the foreground and background colors for each of the 8 semantic 
 
 ```json
 {
-  // zed-highlight extension colors (dark themes)
+  // word-highlight extension colors (dark themes)
   "global_lsp_settings": {
     "semantic_token_rules": [
       {
@@ -138,7 +138,7 @@ An alternative color scheme that should be more suitable for light themes is pro
 
 ```json
 {
-  // zed-highlight extension colors (light themes)
+  // word-highlight extension colors (light themes)
   "global_lsp_settings": {
     "semantic_token_rules": [
       {
@@ -197,7 +197,7 @@ Place the cursor on a word (or select a range of text) and open the code actions
 
 ## Compatibility
 
-The latest release was tested with Zed 1.4.2 (ARM64) on:
+The latest release was tested with Zed 1.7.2 (ARM64) on:
 
 - Apple macOS Tahoe 26.4.1
 - Ubuntu Linux 24.04.3 LTS

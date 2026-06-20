@@ -15,7 +15,7 @@ const REPOSITORY: &str = "0xdea/zed-highlight";
 const BINARY_NAME: &str = "zed-highlight-lsp";
 
 /// Zed extension that allows to highlight all occurrences of selected words.
-struct HighlightExtension {
+struct WordHighlightExtension {
     /// In-process cache of the resolved binary path. Avoids a redundant [`fs::metadata`] call on every
     /// [`zed::Extension::language_server_command`] invocation within the same Zed session. Not persisted across
     /// restarts; the versioned directory on disk serves that role.
@@ -26,7 +26,7 @@ struct HighlightExtension {
     clippy::missing_trait_methods,
     reason = "we need only a subset of the trait methods"
 )]
-impl zed::Extension for HighlightExtension {
+impl zed::Extension for WordHighlightExtension {
     /// Constructs a new instance of the extension.
     fn new() -> Self {
         Self {
@@ -63,14 +63,14 @@ impl zed::Extension for HighlightExtension {
     }
 }
 
-impl HighlightExtension {
+impl WordHighlightExtension {
     /// Ensures the language server binary is available and returns its path. If the binary is not already cached and
     /// valid, checks GitHub for the latest release, downloads the appropriate prebuilt binary for the current platform,
     /// and caches its path for future use.
     ///
     /// # Errors
     ///
-    /// Returns an error if any step of the install process fails as reported by [`HighlightExtension::install_binary`].
+    /// Returns an error if any step of the install process fails as reported by [`WordHighlightExtension::install_binary`].
     fn ensure_binary(&mut self, language_server_id: &LanguageServerId) -> Result<String> {
         // Immediately return the cached path if the file still exists on disk.
         if let Some(path) = self.cached_binary_path.as_ref()
@@ -114,7 +114,7 @@ impl HighlightExtension {
     /// - No suitable prebuilt binary asset is found for the current platform.
     /// - The binary fails to download, extract, or be made executable.
     ///
-    /// Errors bubble up to [`HighlightExtension::ensure_binary`], which is responsible for reporting
+    /// Errors bubble up to [`WordHighlightExtension::ensure_binary`], which is responsible for reporting
     /// [`zed::LanguageServerInstallationStatus::Failed`] to the UI.
     fn install_binary(language_server_id: &LanguageServerId) -> Result<String> {
         // Tell Zed we are checking for an update.
@@ -234,7 +234,7 @@ fn binary_path_in_version(version: &str, os: zed::Os) -> String {
 mod register {
     // The `register_extension!` macro expands to `pub` glue items that the WASM host imports by name.
     // Wrapping the call in a module prevents the `missing_docs` lint from firing.
-    super::zed::register_extension!(super::HighlightExtension);
+    super::zed::register_extension!(super::WordHighlightExtension);
 }
 
 #[cfg(test)]
@@ -259,12 +259,12 @@ mod tests {
         );
     }
 
-    // Test `HighlightExtension::new`.
+    // Test `WordHighlightExtension::new`.
 
     #[test]
     fn new_starts_with_no_cached_path() {
         // Call `new` through the `zed::Extension` trait.
-        let ext = <HighlightExtension as zed::Extension>::new();
+        let ext = <WordHighlightExtension as zed::Extension>::new();
         assert!(
             ext.cached_binary_path.is_none(),
             "a freshly created extension must not have a cached binary path"

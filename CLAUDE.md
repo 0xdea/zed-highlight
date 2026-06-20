@@ -48,7 +48,7 @@ The workspace `[lints]` table in `Cargo.toml` enables clippy `all`, `pedantic`, 
 
 ### Extension side (`src/lib.rs`)
 
-`HighlightExtension::language_server_command` runs on every LSP launch. It first calls `worktree.which(BINARY_NAME)` so a locally-built `zed-highlight-lsp` on `$PATH` wins over the GitHub-downloaded one. The download path (`install_binary`) is wrapped by `ensure_binary`, which is responsible for reporting `LanguageServerInstallationStatus::Failed` to Zed on error — otherwise the UI gets stuck on `CheckingForUpdate`/`Downloading`. Cached binary directories are versioned (`zed-highlight-lsp-<version>/`) and old ones are pruned at every run of `install_binary`.
+`WordHighlightExtension::language_server_command` runs on every LSP launch. It first calls `worktree.which(BINARY_NAME)` so a locally-built `zed-highlight-lsp` on `$PATH` wins over the GitHub-downloaded one. The download path (`install_binary`) is wrapped by `ensure_binary`, which is responsible for reporting `LanguageServerInstallationStatus::Failed` to Zed on error — otherwise the UI gets stuck on `CheckingForUpdate`/`Downloading`. Cached binary directories are versioned (`zed-highlight-lsp-<version>/`) and old ones are pruned at every run of `install_binary`.
 
 ### LSP side (`lsp/src/main.rs`)
 

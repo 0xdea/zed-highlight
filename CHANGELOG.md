@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rename the extension to Word Highlight to make the name more descriptive.
 - Pin `tokio` version.
 - Enable all clippy restriction lints and fix any resulting issues.
 - Improve comments.
