@@ -19,6 +19,8 @@ cargo fmt --all --check
 cargo clippy --all-targets -- -D warnings
 cargo build
 cargo test
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
+cargo audit
 
 # Install the LSP locally for dev (so the extension uses it instead of downloading)
 cargo install --path lsp
@@ -29,8 +31,10 @@ cargo install --path lsp
 
 Two CI workflows live in `.github/workflows/`:
 
-- `build.yml` — runs on every push to `master`: fmt, clippy (warnings-as-errors), test, and build on Linux; test+build on macOS and Windows. Zizmor is also run against all workflows. Match these locally before pushing.
+- `build.yml` — runs on every push to `master`: on Linux, fmt, build, clippy (warnings-as-errors), `cargo audit`, `cargo doc` (rustdoc warnings-as-errors), test, and the wasm extension build; macOS and Windows only run test+build. Zizmor is also run against all workflows. Match these locally before pushing.
 - `release.yml` — triggers on `v*` tags: cross-compiles the LSP binary for all platforms and publishes a GitHub Release with the archives.
+
+Dependency updates are managed via `.github/dependabot.yml` (Cargo + GitHub Actions, grouped, with a 10-day cooldown).
 
 ## Lint posture
 
