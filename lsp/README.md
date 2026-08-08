@@ -3,7 +3,7 @@
 [![](https://img.shields.io/github/stars/0xdea/zed-highlight.svg?style=flat&color=yellow)](https://github.com/0xdea/zed-highlight)
 [![](https://img.shields.io/crates/v/zed-highlight-lsp?style=flat&color=green)](https://crates.io/crates/zed-highlight-lsp)
 [![](https://img.shields.io/crates/d/zed-highlight-lsp?style=flat&color=red)](https://crates.io/crates/zed-highlight-lsp)
-[![](https://img.shields.io/badge/zed-1.x-violet)](https://zed.dev/extensions/html/word-highlight-lsp)
+[![](https://img.shields.io/badge/zed-1.x-violet)](https://zed.dev/extensions/word-highlight-lsp)
 [![](https://img.shields.io/badge/twitter-%400xdea-blue.svg)](https://twitter.com/0xdea)
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
 [![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
@@ -26,7 +26,7 @@ Zed Highlight LSP is a language server implemented for the [Zed editor](https://
 
 ## Installing
 
-For regular use, the correct release binary of Zed Highlight LSP is installed automatically by the [Word Highlight](https://zed.dev/extensions/html/word-highlight-lsp) extension.
+For regular use, the correct release binary of Zed Highlight LSP is installed automatically by the [Word Highlight](https://zed.dev/extensions/word-highlight-lsp) extension.
 
 If you want to install it manually, you can do so via [crates.io](https://crates.io/crates/zed-highlight-lsp):
 
@@ -44,7 +44,7 @@ cargo install --path lsp
 
 ## Usage
 
-The LSP server is automatically launched by the [Word Highlight](https://zed.dev/extensions/html/word-highlight-lsp) extension when you open a supported document in Zed. Refer to the [extension README](https://github.com/0xdea/zed-highlight/blob/master/README.md) for full usage instructions.
+The LSP server is automatically launched by the [Word Highlight](https://zed.dev/extensions/word-highlight-lsp) extension when you open a supported document in Zed. Refer to the [extension README](https://github.com/0xdea/zed-highlight/blob/master/README.md) for full usage instructions.
 
 ## Compatibility
 

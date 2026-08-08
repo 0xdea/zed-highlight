@@ -3,7 +3,7 @@
 [![](https://img.shields.io/github/stars/0xdea/zed-highlight.svg?style=flat&color=yellow)](https://github.com/0xdea/zed-highlight)
 [![](https://img.shields.io/crates/v/zed-highlight-lsp?style=flat&color=green)](https://crates.io/crates/zed-highlight-lsp)
 [![](https://img.shields.io/crates/d/zed-highlight-lsp?style=flat&color=red)](https://crates.io/crates/zed-highlight-lsp)
-[![](https://img.shields.io/badge/zed-1.x-violet)](https://zed.dev/extensions/html/word-highlight-lsp)
+[![](https://img.shields.io/badge/zed-1.x-violet)](https://zed.dev/extensions/word-highlight-lsp)
 [![](https://img.shields.io/badge/twitter-%400xdea-blue.svg)](https://twitter.com/0xdea)
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
 [![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
@@ -13,7 +13,7 @@
 >
 > -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
 
-[Word Highlight](https://zed.dev/extensions/html/word-highlight-lsp) is a language extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
+[Word Highlight](https://zed.dev/extensions/word-highlight-lsp) is a language extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
@@ -44,7 +44,7 @@ The following features are currently supported by the extension and the bundled 
 
 ## Installing
 
-The easiest way to install the Word Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/html/word-highlight-lsp). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically on first use and will check for updates upon startup.
+The easiest way to install the Word Highlight extension is via Zed's [extension marketplace](https://zed.dev/extensions/word-highlight-lsp). It will take care of installing the latest release of the bundled [LSP server](https://github.com/0xdea/zed-highlight/tree/master/lsp) automatically on first use and will check for updates upon startup.
 
 Alternatively, you can clone the repository and install both the extension and the LSP server manually. First, build the LSP server from source and install it:
 
