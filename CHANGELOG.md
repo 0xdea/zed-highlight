@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.4] - 2026-08-08
 
+First release of the extension to be published in Zed's marketplace.
+
 ### Changed
 
 - Update the extension ID to `word-highlight-lsp` to comply with Zed's marketplace naming requirements.
