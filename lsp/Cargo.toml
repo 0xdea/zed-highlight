@@ -1,6 +1,6 @@
 [package]
 name = "zed-highlight-lsp"
-version = "0.1.4-alpha"
+version = "0.1.4"
 authors = ["Marco Ivaldi <raptor@0xdeadbeef.info>"]
 edition = "2024"
 description = "An LSP implemented for Zed that allows to highlight all occurrences of selected words."
