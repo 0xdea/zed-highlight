@@ -5,10 +5,11 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.4] - 2026-08-08
 
 ### Changed
 
+- Update the extension ID to `word-highlight-lsp` to comply with Zed's marketplace naming requirements.
 - Improve CI.
 - Update dependencies.
 
@@ -73,7 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First pre-release of the LSP to be published to [crates.io](https://crates.io/).
 
-[unreleased]: https://github.com/0xdea/zed-highlight/compare/v0.1.3...HEAD
+[unreleased]: https://github.com/0xdea/zed-highlight/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/0xdea/zed-highlight/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/0xdea/zed-highlight/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/0xdea/zed-highlight/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/0xdea/zed-highlight/compare/v0.1.0...v0.1.1
