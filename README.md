@@ -13,7 +13,7 @@
 >
 > -- [@catsalad@infosec.exchange](https://infosec.exchange/@catsalad)
 
-[Word Highlight](https://zed.dev/extensions/word-highlight-lsp) is a language extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
+[Word Highlight](https://zed.dev/extensions/word-highlight-lsp) is a language server extension for the [Zed editor](https://zed.dev/), designed to provide word highlighting. It's useful for quickly identifying all occurrences of selected words in code, enhancing readability and navigation when tracing the execution flow from input sources to potential vulnerability sinks.
 
 ![](https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/screen01.png)
 
@@ -186,7 +186,7 @@ An alternative color scheme that should be more suitable for light themes is pro
 }
 ```
 
-See Zed's [documentation](https://zed.dev/docs/semantic-tokens#customizing-token-colors) for further customization options.
+See my [dotfiles](https://github.com/0xdea/dotfiles) and Zed's [documentation](https://zed.dev/docs/semantic-tokens#customizing-token-colors) for further customization options.
 
 ## Usage
 
@@ -213,6 +213,7 @@ The latest release was tested with Zed 1.14.2 (ARM64) on:
 
 ## TODO
 
+- Use `languages = "*"` when it's made available (see this [comment](https://github.com/zed-industries/extensions/pull/6265#pullrequestreview-4889207634)).
 - Add a minimal command-line interface for manual use of the LSP server outside of Zed.
 - Add and test customizable settings (e.g., `whole_word` and `ignore_case` flags).
 - Add highlighting based on regular expressions.
