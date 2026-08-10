@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rearrange workspace configuration to avoid duplicate entries.
 - Update documentation.
 - Update dependencies.
 

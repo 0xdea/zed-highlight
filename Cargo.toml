@@ -1,14 +1,29 @@
-[package]
-name = "zed-highlight"
+[workspace]
+members = ["lsp"]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.5-alpha"
 authors = ["Marco Ivaldi <raptor@0xdeadbeef.info>"]
 edition = "2024"
-description = "A Zed extension that allows to highlight all occurrences of selected words."
 homepage = "https://0xdeadbeef.info/"
 repository = "https://github.com/0xdea/zed-highlight"
 license = "MIT"
 keywords = ["zed", "zed-extension", "lsp-server", "vuln-dev", "code-review"]
 categories = ["security", "development-tools", "text-editors"]
+
+[package]
+name = "zed-highlight"
+description = "A Zed extension that allows to highlight all occurrences of selected words."
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+# don't publish this package to crates.io
 publish = false
 
 [dependencies]
@@ -27,13 +42,6 @@ panic = "abort"
 
 [profile.dev]
 debug = false
-
-[lints]
-workspace = true
-
-[workspace]
-members = ["lsp"]
-resolver = "2"
 
 [workspace.lints.rust]
 missing_docs = { level = "warn" }
@@ -64,3 +72,6 @@ use_debug = "allow"
 string_slice = "allow"
 indexing_slicing = "allow"
 multiple_crate_versions = "allow"
+
+[lints]
+workspace = true
