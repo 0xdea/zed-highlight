@@ -9,6 +9,7 @@ schema_version = 1
 [language_servers.zed-highlight-lsp]
 name = "Zed Highlight LSP"
 languages = [
+    "Assembly",
     "Bash",
     "C",
     "C++",
