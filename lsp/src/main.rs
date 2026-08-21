@@ -1683,12 +1683,10 @@ mod integration {
 
     /// Converts the flat token array into (`delta_line`, `delta_start`, `length`, `token_type`) 4-tuples,
     /// dropping the always-zero `token_modifiers_bitset` field.
-    #[expect(
-        clippy::missing_asserts_for_indexing,
-        reason = "this negligible performance hit is not important in tests"
-    )]
     fn decode_tokens(data: &[u32]) -> Vec<(u32, u32, u32, u32)> {
-        data.chunks_exact(5)
+        data.as_chunks::<5>()
+            .0
+            .iter()
             .map(|c| (c[0], c[1], c[2], c[3]))
             .collect()
     }
