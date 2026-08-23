@@ -1,7 +1,7 @@
 # zed-highlight
 
 [![](https://img.shields.io/github/stars/0xdea/zed-highlight.svg?style=flat&color=yellow)](https://github.com/0xdea/zed-highlight)
-[![](https://img.shields.io/crates/v/zed-highlight-lsp?style=flat&color=green)](https://crates.io/crates/zed-highlight-lsp)
+[![](https://zedbadge.dev/extension/word-highlight-lsp.svg?style=flat&metric=version&color=67ac09&labelColor=555555style=flat&color=green)](https://zed.dev/extensions/word-highlight-lsp)
 [![](https://zedbadge.dev/extension/word-highlight-lsp.svg?style=flat&color=dd4343&labelColor=555555)](https://zed.dev/extensions/word-highlight-lsp)
 [![](https://img.shields.io/badge/twitter-%400xdea-blue.svg)](https://twitter.com/0xdea)
 [![](https://img.shields.io/badge/mastodon-%40raptor-purple.svg)](https://infosec.exchange/@raptor)
