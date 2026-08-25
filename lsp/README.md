@@ -30,7 +30,7 @@ For regular use, the correct release binary of Zed Highlight LSP is installed au
 If you want to install it manually, you can do so via [crates.io](https://crates.io/crates/zed-highlight-lsp):
 
 ```sh
-cargo install zed-highlight-lsp
+cargo install zed-highlight-lsp --locked
 ```
 
 Alternatively, you can build it from [source](https://github.com/0xdea/zed-highlight):
@@ -38,7 +38,7 @@ Alternatively, you can build it from [source](https://github.com/0xdea/zed-highl
 ```sh
 git clone https://github.com/0xdea/zed-highlight
 cd zed-highlight
-cargo install --path lsp
+cargo install --path lsp --locked
 ```
 
 ## Usage

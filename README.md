@@ -50,14 +50,14 @@ Alternatively, you can clone the repository and install both the extension and t
 ```sh
 git clone https://github.com/0xdea/zed-highlight
 cd zed-highlight
-cargo install --path lsp
+cargo install --path lsp --locked
 ```
 
 Then, in Zed, run `zed: install dev extension` from the command palette and select the `zed-highlight` directory in which you have previously cloned the repository.
 
 > [!NOTE]
 > Zed Highlight LSP is also available on [crates.io](https://crates.io/crates/zed-highlight-lsp).
-> You can install it directly via `cargo install zed-highlight-lsp` if you don't want to build from source.
+> You can install it directly via `cargo install zed-highlight-lsp --locked` if you don't want to build from source.
 
 ## Configuration
 

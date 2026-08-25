@@ -16,14 +16,14 @@ The extension WASM and the LSP binary are independent build artifacts. End users
 ```sh
 # Format / lint / build (workspace-wide)
 cargo fmt --all --check
-cargo clippy --all-targets -- -D warnings
-cargo build
-cargo test
-RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
+cargo clippy --all-targets --locked -- -D warnings
+cargo build --locked
+cargo test --locked
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 cargo audit
 
 # Install the LSP locally for dev (so the extension uses it instead of downloading)
-cargo install --path lsp
+cargo install --path lsp --locked
 
 # Install the dev extension in Zed: run `zed: install dev extension` from the command palette
 # and select this repo's directory.
