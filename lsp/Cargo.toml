@@ -17,7 +17,7 @@ serde_json = "1.0"
 regex = "1.12"
 
 [dev-dependencies]
-tower = "0.4" # tower-lsp depends on this version of tower
+tower = "0.5" # tower-lsp depends on this version of tower
 
 [[bin]]
 name = "zed-highlight-lsp"
