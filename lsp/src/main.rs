@@ -4,13 +4,8 @@
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/0xdea/zed-highlight/master/.img/logo.png"
 )]
-#![allow(
-    clippy::wildcard_imports,
-    reason = "implicit import of all LSP types is more convenient than listing them one by one"
-)]
 
 use std::collections::HashMap;
-use std::option::Option;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -18,6 +13,14 @@ use regex::{Regex, RegexBuilder};
 use tokio::sync::Mutex;
 use tokio::{io, task, time};
 use tower_lsp::jsonrpc::Result;
+// Clippy skips `wildcard_imports` in test builds, so the expectation would be unfulfilled there.
+#[cfg_attr(
+    not(test),
+    expect(
+        clippy::wildcard_imports,
+        reason = "implicit import of all LSP types is more convenient than listing them one by one"
+    )
+)]
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
@@ -29,6 +32,9 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const NUM_COLORS: usize = 8;
 /// Delay in milliseconds for the debounced refresh after edits.
 const DEBOUNCE_DELAY_MS: u64 = 250;
+
+/// Absolute position of a single match as a (`line`, `start`, `length`, `token_type`) 4-tuple, before delta encoding.
+type RawToken = (u32, u32, u32, u32);
 
 /// These names are arbitrary strings that the LSP advertises as its semantic token type legend. Zed looks them up in
 /// `global_lsp_settings.semantic_token_rules` (settings.json file) to map each name to a foreground/background color.
@@ -220,17 +226,13 @@ impl Backend {
         clippy::as_conversions,
         reason = "the `as` conversion is safe here because of the modulo operation"
     )]
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "subtractions should be safe here"
-    )]
     async fn build_tokens(&self, uri: &Url) -> Vec<SemanticToken> {
         // Snapshot the state and release the lock.
         let (content, words, whole_word, ignore_case) = {
             let state = self.state.lock().await;
             let Some(content) = state.docs.get(uri).cloned() else {
                 // Document not yet registered: return empty; the debounced refresh will fix it.
-                return vec![];
+                return Vec::new();
             };
             (
                 content,
@@ -240,8 +242,8 @@ impl Backend {
             )
         };
 
-        // Collect all matches as absolute (`line`, `start`, `length`, `token_type`) 4-tuples.
-        let mut raw: Vec<(u32, u32, u32, u32)> = Vec::new();
+        // Collect all matches as absolute positions.
+        let mut raw = Vec::<RawToken>::new();
 
         for (color_idx, slot) in words.iter().enumerate() {
             let word = match slot.as_deref() {
@@ -269,8 +271,9 @@ impl Backend {
             }
         }
 
-        // Sort by (`line`, `start`).
-        raw.sort_unstable_by(|left, right| left.0.cmp(&right.0).then(left.1.cmp(&right.1)));
+        // Sort by (`line`, `start`). Tuples compare lexicographically, so tokens overlapping at the same position are
+        // deterministically ordered by `length` and then by `token_type`.
+        raw.sort_unstable();
 
         // Convert absolute positions to the LSP delta encoding.
         //
@@ -284,11 +287,18 @@ impl Backend {
         let mut prev_start = 0;
 
         for (line, start, length, token_type) in raw {
-            let delta_line = line - prev_line;
-            let delta_start = if delta_line == 0 {
-                start - prev_start
+            // Sorting guarantees that neither subtraction underflows. Should that ever break, skip the token rather
+            // than emit a corrupted delta; `prev_line` and `prev_start` are only updated for emitted tokens, so the
+            // rest of the stream stays correctly encoded.
+            let Some(delta_line) = line.checked_sub(prev_line) else {
+                continue;
+            };
+            let Some(delta_start) = (if delta_line == 0 {
+                start.checked_sub(prev_start)
             } else {
-                start
+                Some(start)
+            }) else {
+                continue;
             };
             tokens.push(SemanticToken {
                 delta_line,
@@ -336,7 +346,7 @@ impl LanguageServer for Backend {
                                     .iter()
                                     .map(|&name| SemanticTokenType::new(name))
                                     .collect(),
-                                token_modifiers: vec![],
+                                token_modifiers: Vec::new(),
                             },
                             full: Some(SemanticTokensFullOptions::Bool(true)),
                             range: None,
@@ -464,9 +474,8 @@ impl LanguageServer for Backend {
     async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
         // Snapshot the state.
         let state = self.state.lock().await;
-        let content = match state.docs.get(&params.text_document.uri) {
-            Some(content) => Arc::clone(content),
-            None => return Ok(None),
+        let Some(content) = state.docs.get(&params.text_document.uri).cloned() else {
+            return Ok(None);
         };
         let has_any = state.has_any();
 
@@ -479,7 +488,7 @@ impl LanguageServer for Backend {
         drop(state);
 
         // Build the list of code actions to return.
-        let mut actions: Vec<CodeActionOrCommand> = Vec::new();
+        let mut actions = Vec::<CodeActionOrCommand>::new();
 
         // Highlight toggle action for the current word, if any.
         if let Some(word) = word.as_ref() {
@@ -576,20 +585,17 @@ fn utf16_len(text: &str) -> u32 {
 }
 
 /// Helper function to convert a UTF-16 character offset to a byte offset within `text`.
-#[expect(
-    clippy::arithmetic_side_effects,
-    reason = "`count` cannot reasonably overflow here"
-)]
 fn utf16_to_byte(text: &str, utf16_offset: usize) -> Option<usize> {
-    let mut count = 0;
+    let mut count = 0_usize;
     for (byte_idx, ch) in text.char_indices() {
         // Check the offset before counting the current character.
         if count == utf16_offset {
             return Some(byte_idx);
         }
-        count += ch.len_utf16();
+        count = count.checked_add(ch.len_utf16())?;
     }
-    // Returns `None` if the offset is past the end of the string (shouldn't happen with valid LSP data).
+    // Returns `None` if the offset is past the end of the string (shouldn't happen with valid LSP data) or if the
+    // UTF-16 count overflows.
     (count == utf16_offset).then_some(text.len())
 }
 
@@ -649,7 +655,7 @@ fn word_at(content: &str, range: Range) -> Option<String> {
             .last()
             .map_or(0, |(byte_idx, ch)| byte_idx + ch.len_utf8());
 
-    (start < end).then(|| line[start..end].to_string())
+    (start < end).then(|| line[start..end].to_owned())
 }
 
 /// Helper function to check if a character is a "word character" for the purposes of determining word boundaries.
@@ -1973,6 +1979,23 @@ mod integration {
             decoded,
             [(0, 0, 3, 0), (0, 4, 3, 1)],
             "baz must reuse slot 0 (color 0) after foo was removed; bar must keep slot 1 (color 1)"
+        );
+    }
+
+    /// Two highlighted words can produce overlapping tokens at the same position (e.g., "foo" and "foo.bar"). They
+    /// must be emitted in a deterministic order: shorter token first, then lower token type.
+    #[tokio::test]
+    async fn tokens_overlapping_at_same_start_are_deterministically_ordered() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "foo.bar").await;
+        toggle(&mut svc, 1, "foo.bar").await; // slot 0, color 0
+        toggle(&mut svc, 2, "foo").await; // slot 1, color 1
+        let data = get_tokens(&mut svc, 3, URI).await;
+        let decoded = decode_tokens(&data);
+        assert_eq!(
+            decoded,
+            [(0, 0, 3, 1), (0, 0, 7, 0)],
+            "overlapping tokens at the same start must be ordered by length, then token type"
         );
     }
 

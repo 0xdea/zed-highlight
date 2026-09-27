@@ -48,8 +48,8 @@ impl zed::Extension for WordHighlightExtension {
         if let Some(path) = worktree.which(BINARY_NAME) {
             return Ok(zed::Command {
                 command: path,
-                args: vec![],
-                env: vec![],
+                args: Vec::new(),
+                env: Vec::new(),
             });
         }
 
@@ -57,8 +57,8 @@ impl zed::Extension for WordHighlightExtension {
         let binary_path = self.ensure_binary(language_server_id)?;
         Ok(zed::Command {
             command: binary_path,
-            args: vec![],
-            env: vec![],
+            args: Vec::new(),
+            env: Vec::new(),
         })
     }
 }
@@ -81,27 +81,22 @@ impl WordHighlightExtension {
 
         // Run the install pipeline. On error, surface a `Failed` status to Zed before propagating so the UI doesn't
         // get stuck on `CheckingForUpdate` or `Downloading`.
-        let result = Self::install_binary(language_server_id);
-
-        match result {
-            Ok(binary_path) => {
+        Self::install_binary(language_server_id)
+            .inspect(|binary_path| {
                 // Reset Zed language server installation status indicator and populate the cache.
                 zed::set_language_server_installation_status(
                     language_server_id,
                     &zed::LanguageServerInstallationStatus::None,
                 );
                 self.cached_binary_path = Some(binary_path.clone());
-                Ok(binary_path)
-            }
-            Err(err) => {
+            })
+            .inspect_err(|err| {
                 // Report failure to Zed so the UI can update accordingly.
                 zed::set_language_server_installation_status(
                     language_server_id,
                     &zed::LanguageServerInstallationStatus::Failed(err.clone()),
                 );
-                Err(err)
-            }
-        }
+            })
     }
 
     /// Performs the actual install steps (fetch release metadata, download and extract the latest release archive,
