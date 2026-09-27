@@ -74,7 +74,7 @@ impl WordHighlightExtension {
     fn ensure_binary(&mut self, language_server_id: &LanguageServerId) -> Result<String> {
         // Immediately return the cached path if the file still exists on disk.
         if let Some(path) = self.cached_binary_path.as_ref()
-            && fs::metadata(path).is_ok_and(|m| m.is_file())
+            && fs::metadata(path).is_ok_and(|metadata| metadata.is_file())
         {
             return Ok(path.clone());
         }
@@ -93,13 +93,13 @@ impl WordHighlightExtension {
                 self.cached_binary_path = Some(binary_path.clone());
                 Ok(binary_path)
             }
-            Err(e) => {
+            Err(err) => {
                 // Report failure to Zed so the UI can update accordingly.
                 zed::set_language_server_installation_status(
                     language_server_id,
-                    &zed::LanguageServerInstallationStatus::Failed(e.clone()),
+                    &zed::LanguageServerInstallationStatus::Failed(err.clone()),
                 );
-                Err(e)
+                Err(err)
             }
         }
     }
@@ -131,7 +131,7 @@ impl WordHighlightExtension {
                 pre_release: false,
             },
         )
-        .map_err(|e| format!("failed to fetch latest GitHub release: {e}"))?;
+        .map_err(|err| format!("failed to fetch latest GitHub release: {err}"))?;
 
         // Determine which prebuilt asset to download for the current platform.
         let (os, arch) = zed::current_platform();
@@ -144,7 +144,7 @@ impl WordHighlightExtension {
         let binary_path = binary_path_in_version(&release.version, os);
 
         // Download and extract the binary if it's not already present.
-        if !fs::metadata(&binary_path).is_ok_and(|m| m.is_file()) {
+        if !fs::metadata(&binary_path).is_ok_and(|metadata| metadata.is_file()) {
             // Tell Zed we are downloading the update.
             zed::set_language_server_installation_status(
                 language_server_id,
@@ -154,7 +154,7 @@ impl WordHighlightExtension {
             let asset = release
                 .assets
                 .iter()
-                .find(|a| a.name == asset_name)
+                .find(|asset| asset.name == asset_name)
                 .ok_or_else(|| {
                     format!(
                         "no prebuilt binary found for {asset_name}. \
@@ -168,11 +168,11 @@ impl WordHighlightExtension {
                 &version_dir,
                 zed::DownloadedFileType::GzipTar,
             )
-            .map_err(|e| format!("failed to download {BINARY_NAME}: {e}"))?;
+            .map_err(|err| format!("failed to download {BINARY_NAME}: {err}"))?;
 
             // Ensure the binary is executable (this is a no-op on Windows or if the bit is already set).
             zed::make_file_executable(&binary_path)
-                .map_err(|e| format!("failed to make {BINARY_NAME} executable: {e}"))?;
+                .map_err(|err| format!("failed to make {BINARY_NAME} executable: {err}"))?;
         }
 
         // Remove any other directories to avoid unbounded disk growth. Runs unconditionally so that we self-heal when a
@@ -193,7 +193,6 @@ impl WordHighlightExtension {
 ///
 /// Asset names follow the pattern `{BINARY_NAME}-{os}-{arch}.tar.gz` and are
 /// matched against GitHub Release asset names during installation.
-#[expect(clippy::shadow_reuse, reason = "shadowing is convenient here")]
 fn platform_asset_name(os: zed::Os, arch: zed::Architecture) -> String {
     let os = match os {
         zed::Os::Mac => "darwin",

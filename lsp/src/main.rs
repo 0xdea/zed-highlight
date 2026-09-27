@@ -103,14 +103,13 @@ impl State {
     /// 2. Word is new and there's a `None` slot: reuse the first free slot so we reclaim the color index.
     /// 3. Word is new and there are no free slots: grow the list appending a new `Some(word)`.
     fn toggle(&mut self, word: &str) {
-        if let Some(idx) = self
-            .words
-            .iter()
-            .position(|o| o.as_deref().is_some_and(|w| self.words_eq(w, word)))
-        {
+        if let Some(idx) = self.words.iter().position(|slot| {
+            slot.as_deref()
+                .is_some_and(|existing| self.words_eq(existing, word))
+        }) {
             // Case 1: Word is already in the list: soft-delete it preserving the slot (set its slot to `None`).
             self.words[idx] = None;
-        } else if let Some(slot) = self.words.iter_mut().find(|o| o.is_none()) {
+        } else if let Some(slot) = self.words.iter_mut().find(|slot| slot.is_none()) {
             // Case 2: Word is new and there's a `None` slot: reuse the first free slot so we reclaim the color index.
             *slot = Some(word.to_owned());
         } else {
@@ -130,11 +129,11 @@ impl State {
     }
 
     /// Helper function to compare two words for equality, respecting the [`State::ignore_case`] flag.
-    fn words_eq(&self, a: &str, b: &str) -> bool {
+    fn words_eq(&self, left: &str, right: &str) -> bool {
         if self.ignore_case {
-            a.to_lowercase() == b.to_lowercase()
+            left.to_lowercase() == right.to_lowercase()
         } else {
-            a == b
+            left == right
         }
     }
 }
@@ -175,8 +174,8 @@ impl Backend {
     async fn immediate_refresh(&self) {
         // Cancel any pending debounced refresh.
         let refresh_handle = self.refresh_handle.lock().await.take();
-        if let Some(h) = refresh_handle {
-            h.abort();
+        if let Some(handle) = refresh_handle {
+            handle.abort();
         }
 
         // Send the refresh request to Zed, ignoring any errors.
@@ -190,8 +189,8 @@ impl Backend {
         let mut guard = self.refresh_handle.lock().await;
 
         // Cancel any pending debounced refresh.
-        if let Some(h) = guard.take() {
-            h.abort();
+        if let Some(handle) = guard.take() {
+            handle.abort();
         }
 
         // Schedule a new debounced refresh request.
@@ -244,9 +243,9 @@ impl Backend {
         // Collect all matches as absolute (`line`, `start`, `length`, `token_type`) 4-tuples.
         let mut raw: Vec<(u32, u32, u32, u32)> = Vec::new();
 
-        for (color_idx, opt) in words.iter().enumerate() {
-            let word = match opt.as_deref() {
-                Some(w) if !w.is_empty() => w,
+        for (color_idx, slot) in words.iter().enumerate() {
+            let word = match slot.as_deref() {
+                Some(word) if !word.is_empty() => word,
                 // Skip `None` (soft-deleted) and empty-string slots.
                 _ => continue,
             };
@@ -261,17 +260,17 @@ impl Backend {
             let token_type = (color_idx % NUM_COLORS) as u32;
 
             for (line_idx, line) in content.lines().enumerate() {
-                for m in re.find_iter(line) {
+                for found in re.find_iter(line) {
                     // The LSP protocol requires UTF-16 character offsets, so we convert.
-                    let start = utf16_len(&line[..m.start()]);
-                    let length = utf16_len(m.as_str());
+                    let start = utf16_len(&line[..found.start()]);
+                    let length = utf16_len(found.as_str());
                     raw.push((line_idx as u32, start, length, token_type));
                 }
             }
         }
 
         // Sort by (`line`, `start`).
-        raw.sort_unstable_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+        raw.sort_unstable_by(|left, right| left.0.cmp(&right.0).then(left.1.cmp(&right.1)));
 
         // Convert absolute positions to the LSP delta encoding.
         //
@@ -335,7 +334,7 @@ impl LanguageServer for Backend {
                             legend: SemanticTokensLegend {
                                 token_types: TOKEN_TYPE_NAMES
                                     .iter()
-                                    .map(|&n| SemanticTokenType::new(n))
+                                    .map(|&name| SemanticTokenType::new(name))
                                     .collect(),
                                 token_modifiers: vec![],
                             },
@@ -466,15 +465,15 @@ impl LanguageServer for Backend {
         // Snapshot the state.
         let state = self.state.lock().await;
         let content = match state.docs.get(&params.text_document.uri) {
-            Some(c) => Arc::clone(c),
+            Some(content) => Arc::clone(content),
             None => return Ok(None),
         };
         let has_any = state.has_any();
 
         // Find the highlightable word the user is acting on, if any.
         let word = word_at(&content, params.range)
-            .filter(|w| is_highlightable(w, state.whole_word))
-            .filter(|w| matches_anywhere(&content, w, state.whole_word, state.ignore_case));
+            .filter(|word| is_highlightable(word, state.whole_word))
+            .filter(|word| matches_anywhere(&content, word, state.whole_word, state.ignore_case));
 
         // Explicitly release the lock before building the response.
         drop(state);
@@ -483,16 +482,16 @@ impl LanguageServer for Backend {
         let mut actions: Vec<CodeActionOrCommand> = Vec::new();
 
         // Highlight toggle action for the current word, if any.
-        if let Some(w) = word.as_ref() {
+        if let Some(word) = word.as_ref() {
             actions.push(CodeActionOrCommand::CodeAction(CodeAction {
-                title: format!("Toggle highlight: \"{w}\""),
+                title: format!("Toggle highlight: \"{word}\""),
                 kind: Some(CodeActionKind::EMPTY),
                 // The [`Command`] is embedded in the [`CodeAction`] and passed back to [`Backend::execute_command`]
                 // when the user selects this item. We encode the word as the single argument.
                 command: Some(Command {
                     title: "Toggle Highlight".to_owned(),
                     command: "zed-highlight.toggle".to_owned(),
-                    arguments: Some(vec![serde_json::Value::String(w.clone())]),
+                    arguments: Some(vec![serde_json::Value::String(word.clone())]),
                 }),
                 ..Default::default()
             }));
@@ -530,13 +529,13 @@ impl LanguageServer for Backend {
                     .arguments
                     .into_iter()
                     .next()
-                    .and_then(|v| v.as_str().map(str::to_owned));
-                if let Some(w) = word {
+                    .and_then(|arg| arg.as_str().map(str::to_owned));
+                if let Some(word) = word {
                     // Toggle the word in the highlight list only if it's highlightable.
                     let toggled = {
                         let mut state = self.state.lock().await;
-                        if is_highlightable(&w, state.whole_word) {
-                            state.toggle(&w);
+                        if is_highlightable(&word, state.whole_word) {
+                            state.toggle(&word);
                             true
                         } else {
                             false
@@ -572,26 +571,26 @@ impl LanguageServer for Backend {
     clippy::as_conversions,
     reason = "the `as` conversion is reasonably safe here because we are operating on strings"
 )]
-fn utf16_len(s: &str) -> u32 {
-    s.chars().map(|c| c.len_utf16() as u32).sum()
+fn utf16_len(text: &str) -> u32 {
+    text.chars().map(|ch| ch.len_utf16() as u32).sum()
 }
 
-/// Helper function to convert a UTF-16 character offset to a byte offset within `s`.
+/// Helper function to convert a UTF-16 character offset to a byte offset within `text`.
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "`count` cannot reasonably overflow here"
 )]
-fn utf16_to_byte(s: &str, utf16_offset: usize) -> Option<usize> {
+fn utf16_to_byte(text: &str, utf16_offset: usize) -> Option<usize> {
     let mut count = 0;
-    for (i, c) in s.char_indices() {
+    for (byte_idx, ch) in text.char_indices() {
         // Check the offset before counting the current character.
         if count == utf16_offset {
-            return Some(i);
+            return Some(byte_idx);
         }
-        count += c.len_utf16();
+        count += ch.len_utf16();
     }
     // Returns `None` if the offset is past the end of the string (shouldn't happen with valid LSP data).
-    (count == utf16_offset).then_some(s.len())
+    (count == utf16_offset).then_some(text.len())
 }
 
 /// Helper function to return the word the user is acting on, given the cursor range from a code action request.
@@ -616,10 +615,10 @@ fn word_at(content: &str, range: Range) -> Option<String> {
 
     // Case 1: Use the non-empty single-line selection directly (multi-line selections fall through to case 2).
     if range.start.line == range.end.line && range.start.character != range.end.character {
-        let s = utf16_to_byte(line, range.start.character as usize)?;
-        let e = utf16_to_byte(line, range.end.character as usize)?;
-        if s < e {
-            let text = line[s..e].trim().to_owned();
+        let sel_start = utf16_to_byte(line, range.start.character as usize)?;
+        let sel_end = utf16_to_byte(line, range.end.character as usize)?;
+        if sel_start < sel_end {
+            let text = line[sel_start..sel_end].trim().to_owned();
             if !text.is_empty() {
                 return Some(text);
             }
@@ -638,24 +637,24 @@ fn word_at(content: &str, range: Range) -> Option<String> {
     let start = line[..byte_pos]
         .char_indices()
         .rev()
-        .take_while(|&(_, c)| is_word_char(c))
+        .take_while(|&(_, ch)| is_word_char(ch))
         .last()
-        .map_or(byte_pos, |(i, _)| i);
+        .map_or(byte_pos, |(byte_idx, _)| byte_idx);
 
     // Scan right from the cursor position to find the end of the word.
     let end = byte_pos
         + line[byte_pos..]
             .char_indices()
-            .take_while(|&(_, c)| is_word_char(c))
+            .take_while(|&(_, ch)| is_word_char(ch))
             .last()
-            .map_or(0, |(i, c)| i + c.len_utf8());
+            .map_or(0, |(byte_idx, ch)| byte_idx + ch.len_utf8());
 
     (start < end).then(|| line[start..end].to_string())
 }
 
 /// Helper function to check if a character is a "word character" for the purposes of determining word boundaries.
-fn is_word_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
+fn is_word_char(ch: char) -> bool {
+    ch.is_alphanumeric() || ch == '_'
 }
 
 /// Helper function to check whether a given text can produce visible highlights based on the current matching rules.
@@ -734,15 +733,15 @@ mod tests {
 
     // Helper functions.
 
-    fn make_range(sl: u32, sc: u32, el: u32, ec: u32) -> Range {
+    fn make_range(start_line: u32, start_char: u32, end_line: u32, end_char: u32) -> Range {
         Range {
             start: Position {
-                line: sl,
-                character: sc,
+                line: start_line,
+                character: start_char,
             },
             end: Position {
-                line: el,
-                character: ec,
+                line: end_line,
+                character: end_char,
             },
         }
     }
@@ -755,81 +754,81 @@ mod tests {
 
     #[test]
     fn state_new_has_empty_word_list() {
-        let s = State::new();
-        assert!(s.words.is_empty());
+        let state = State::new();
+        assert!(state.words.is_empty());
     }
 
     #[test]
     fn state_new_has_empty_docs() {
-        let s = State::new();
-        assert!(s.docs.is_empty());
+        let state = State::new();
+        assert!(state.docs.is_empty());
     }
 
     #[test]
     fn state_new_defaults_whole_word_true() {
-        let s = State::new();
-        assert!(s.whole_word);
+        let state = State::new();
+        assert!(state.whole_word);
     }
 
     #[test]
     fn state_new_defaults_ignore_case_false() {
-        let s = State::new();
-        assert!(!s.ignore_case);
+        let state = State::new();
+        assert!(!state.ignore_case);
     }
 
     // Test `State::toggle`.
 
     #[test]
     fn state_toggle_adds_new_word() {
-        let mut s = State::new();
-        s.toggle("foo");
-        assert_eq!(s.words, vec![Some("foo".to_owned())]);
+        let mut state = State::new();
+        state.toggle("foo");
+        assert_eq!(state.words, vec![Some("foo".to_owned())]);
     }
 
     #[test]
     fn state_toggle_removes_existing_word_leaving_none_slot() {
-        let mut s = State::new();
-        s.toggle("foo");
-        s.toggle("foo");
-        assert_eq!(s.words, vec![None]);
+        let mut state = State::new();
+        state.toggle("foo");
+        state.toggle("foo");
+        assert_eq!(state.words, vec![None]);
     }
 
     #[test]
     fn state_toggle_reuses_first_none_slot_for_new_word() {
-        let mut s = State::new();
-        s.toggle("foo"); // slot 0 = Some("foo")
-        s.toggle("foo"); // slot 0 = None
-        s.toggle("bar"); // should reuse slot 0, not grow
-        assert_eq!(s.words, vec![Some("bar".to_owned())]);
+        let mut state = State::new();
+        state.toggle("foo"); // slot 0 = Some("foo")
+        state.toggle("foo"); // slot 0 = None
+        state.toggle("bar"); // should reuse slot 0, not grow
+        assert_eq!(state.words, vec![Some("bar".to_owned())]);
     }
 
     #[test]
     fn state_toggle_grows_list_when_no_free_slots() {
-        let mut s = State::new();
-        s.toggle("a");
-        s.toggle("b");
-        assert_eq!(s.words.len(), 2);
-        assert!(s.words.iter().all(Option::is_some));
+        let mut state = State::new();
+        state.toggle("a");
+        state.toggle("b");
+        assert_eq!(state.words.len(), 2);
+        assert!(state.words.iter().all(Option::is_some));
     }
 
     #[test]
     fn state_toggle_leaves_other_words_in_place_after_removal() {
-        let mut s = State::new();
-        s.toggle("a");
-        s.toggle("b");
-        s.toggle("a"); // soft-delete "a"
-        assert!(s.words[0].is_none(), "removed slot must be `None`");
-        assert_eq!(s.words[1], Some("b".to_owned()));
+        let mut state = State::new();
+        state.toggle("a");
+        state.toggle("b");
+        state.toggle("a"); // soft-delete "a"
+        assert!(state.words[0].is_none(), "removed slot must be `None`");
+        assert_eq!(state.words[1], Some("b".to_owned()));
     }
 
     #[test]
     fn state_toggle_respects_ignore_case_for_deduplication() {
-        let mut s = State::new();
-        s.ignore_case = true;
-        s.toggle("Foo");
-        s.toggle("foo"); // should match "Foo" and remove it
+        let mut state = State::new();
+        state.ignore_case = true;
+        state.toggle("Foo");
+        state.toggle("foo"); // should match "Foo" and remove it
         assert!(
-            !s.has_any(),
+            !state.has_any(),
             "case-insensitive toggle of the same word must leave no highlights"
         );
     }
@@ -843,75 +842,75 @@ mod tests {
 
     #[test]
     fn state_has_any_false_when_all_slots_are_none() {
-        let mut s = State::new();
-        s.toggle("a");
-        s.toggle("a");
-        assert!(!s.has_any());
+        let mut state = State::new();
+        state.toggle("a");
+        state.toggle("a");
+        assert!(!state.has_any());
     }
 
     #[test]
     fn state_has_any_true_when_at_least_one_word_present() {
-        let mut s = State::new();
-        s.toggle("a");
-        assert!(s.has_any());
+        let mut state = State::new();
+        state.toggle("a");
+        assert!(state.has_any());
     }
 
     #[test]
     fn state_has_any_true_with_mixed_none_and_some() {
-        let mut s = State::new();
-        s.toggle("a");
-        s.toggle("b");
-        s.toggle("a"); // remove "a", keep "b"
-        assert!(s.has_any());
+        let mut state = State::new();
+        state.toggle("a");
+        state.toggle("b");
+        state.toggle("a"); // remove "a", keep "b"
+        assert!(state.has_any());
     }
 
     // Test `State::words_clear`.
 
     #[test]
     fn state_words_clear_empties_list() {
-        let mut s = State::new();
-        s.toggle("a");
-        s.toggle("b");
-        s.words_clear();
-        assert!(s.words.is_empty());
+        let mut state = State::new();
+        state.toggle("a");
+        state.toggle("b");
+        state.words_clear();
+        assert!(state.words.is_empty());
     }
 
     #[test]
     fn state_words_clear_results_in_has_any_false() {
-        let mut s = State::new();
-        s.toggle("a");
-        s.words_clear();
-        assert!(!s.has_any());
+        let mut state = State::new();
+        state.toggle("a");
+        state.words_clear();
+        assert!(!state.has_any());
     }
 
     // Test `State::words_eq`.
 
     #[test]
     fn state_words_eq_identical_strings() {
-        let s = State::new();
-        assert!(s.words_eq("hello", "hello"));
+        let state = State::new();
+        assert!(state.words_eq("hello", "hello"));
     }
 
     #[test]
     fn state_words_eq_case_sensitive_by_default() {
-        let s = State::new();
-        assert!(!s.words_eq("Foo", "foo"));
+        let state = State::new();
+        assert!(!state.words_eq("Foo", "foo"));
     }
 
     #[test]
     fn state_words_eq_case_insensitive_when_flag_set() {
-        let mut s = State::new();
-        s.ignore_case = true;
-        assert!(s.words_eq("Foo", "foo"));
-        assert!(s.words_eq("FOO", "foo"));
+        let mut state = State::new();
+        state.ignore_case = true;
+        assert!(state.words_eq("Foo", "foo"));
+        assert!(state.words_eq("FOO", "foo"));
     }
 
     #[test]
     fn state_words_eq_different_words_always_false() {
-        let mut s = State::new();
-        assert!(!s.words_eq("foo", "bar"));
-        s.ignore_case = true;
-        assert!(!s.words_eq("foo", "bar"));
+        let mut state = State::new();
+        assert!(!state.words_eq("foo", "bar"));
+        state.ignore_case = true;
+        assert!(!state.words_eq("foo", "bar"));
     }
 
     // Test `utf16_len`.
@@ -1031,10 +1030,10 @@ mod tests {
 
     #[test]
     fn is_word_char_punctuation_is_false() {
-        for c in [
+        for ch in [
             '.', ',', '!', '(', ')', '-', '+', '=', '*', '/', '\\', '"', '\'', ';', ':',
         ] {
-            assert!(!is_word_char(c), "'{c}' should not be a word char");
+            assert!(!is_word_char(ch), "'{ch}' should not be a word char");
         }
     }
 
@@ -1449,11 +1448,10 @@ mod integration {
 
     /// Serializes `req` as a JSON-RPC request, drives it through the service, and returns the serialized response.
     /// Notifications (no `id` field) produce `None`; requests produce `Some(response_json)`.
-    #[expect(clippy::shadow_reuse, reason = "shadowing is convenient here")]
     async fn call_inner(svc: &mut Svc, req: serde_json::Value) -> Option<serde_json::Value> {
         let req: jsonrpc::Request = serde_json::from_value(req).unwrap();
         let res = svc.ready().await.unwrap().call(req).await.unwrap();
-        res.map(|r| serde_json::to_value(r).unwrap())
+        res.map(|response| serde_json::to_value(response).unwrap())
     }
 
     /// Creates a fresh service and completes the mandatory LSP handshake (`initialize` -> `initialized`).
@@ -1613,7 +1611,7 @@ mod integration {
             .as_array()
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|v| v["title"].as_str().map(str::to_owned))
+                    .filter_map(|action| action["title"].as_str().map(str::to_owned))
                     .collect()
             })
             .unwrap_or_default()
@@ -1651,7 +1649,7 @@ mod integration {
             .as_array()
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|v| v["title"].as_str().map(str::to_owned))
+                    .filter_map(|action| action["title"].as_str().map(str::to_owned))
                     .collect()
             })
             .unwrap_or_default()
@@ -1677,7 +1675,7 @@ mod integration {
             .as_array()
             .unwrap()
             .iter()
-            .map(|v| u32::try_from(v.as_u64().unwrap()).unwrap())
+            .map(|value| u32::try_from(value.as_u64().unwrap()).unwrap())
             .collect()
     }
 
@@ -1687,7 +1685,7 @@ mod integration {
         data.as_chunks::<5>()
             .0
             .iter()
-            .map(|c| (c[0], c[1], c[2], c[3]))
+            .map(|chunk| (chunk[0], chunk[1], chunk[2], chunk[3]))
             .collect()
     }
 
@@ -1791,8 +1789,8 @@ mod integration {
     async fn tokens_color_wraps_past_num_colors() {
         let mut svc = make_service().await;
         open(&mut svc, URI, "w0 w1 w2 w3 w4 w5 w6 w7 w8").await;
-        for (id, w) in (1_u32..).zip(["w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8"]) {
-            toggle(&mut svc, id, w).await;
+        for (id, word) in (1_u32..).zip(["w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8"]) {
+            toggle(&mut svc, id, word).await;
         }
         let data = get_tokens(&mut svc, 10, URI).await;
         assert_eq!(data.len(), 9 * 5, "nine tokens, each with 5 fields");
@@ -1868,15 +1866,15 @@ mod integration {
 
         let expected = r#"Toggle highlight: "foo""#;
         assert!(
-            actions_before.iter().any(|a| a == expected),
+            actions_before.iter().any(|title| title == expected),
             "expected stateless title before any toggle; got: {actions_before:?}"
         );
         assert!(
-            actions_after.iter().any(|a| a == expected),
+            actions_after.iter().any(|title| title == expected),
             "expected stateless title after toggle on; got: {actions_after:?}"
         );
         assert!(
-            actions_after2.iter().any(|a| a == expected),
+            actions_after2.iter().any(|title| title == expected),
             "expected stateless title after toggle off; got: {actions_after2:?}"
         );
     }
@@ -1913,11 +1911,13 @@ mod integration {
         open(&mut svc, URI, "foo").await;
         let actions = code_action(&mut svc, 1, URI, 0, 0).await;
         assert!(
-            actions.iter().any(|a| a.contains("Toggle highlight")),
+            actions
+                .iter()
+                .any(|title| title.contains("Toggle highlight")),
             "toggle action must be present when cursor is on a valid word"
         );
         assert!(
-            !actions.iter().any(|a| a.contains("Clear")),
+            !actions.iter().any(|title| title.contains("Clear")),
             "clear action must not appear when no words are highlighted"
         );
     }
@@ -1930,11 +1930,13 @@ mod integration {
         toggle(&mut svc, 1, "foo").await;
         let actions = code_action(&mut svc, 2, URI, 0, 0).await;
         assert!(
-            actions.iter().any(|a| a.contains("Toggle highlight")),
+            actions
+                .iter()
+                .any(|title| title.contains("Toggle highlight")),
             "toggle action must be present"
         );
         assert!(
-            actions.iter().any(|a| a.contains("Clear")),
+            actions.iter().any(|title| title.contains("Clear")),
             "clear action must appear when at least one word is highlighted"
         );
     }
@@ -2039,7 +2041,7 @@ mod integration {
         assert!(
             actions
                 .iter()
-                .any(|a| a == r#"Toggle highlight: "foo.bar""#),
+                .any(|title| title == r#"Toggle highlight: "foo.bar""#),
             "selection must yield a toggle action for the full selected text; got: {actions:?}"
         );
     }

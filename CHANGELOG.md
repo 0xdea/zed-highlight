@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Rearrange workspace configuration to avoid duplicate entries.
 - Use the `--locked` flag for all suitable `cargo` commands.
+- Improve code style.
 - Update documentation.
 - Update dependencies.
 
