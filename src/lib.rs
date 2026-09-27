@@ -70,7 +70,8 @@ impl WordHighlightExtension {
     ///
     /// # Errors
     ///
-    /// Returns an error if any step of the install process fails as reported by [`WordHighlightExtension::install_binary`].
+    /// Returns an error if any step of the install process fails as reported by
+    /// [`WordHighlightExtension::install_binary`].
     fn ensure_binary(&mut self, language_server_id: &LanguageServerId) -> Result<String> {
         // Immediately return the cached path if the file still exists on disk.
         if let Some(path) = self.cached_binary_path.as_ref()
@@ -236,6 +237,7 @@ mod register {
     super::zed::register_extension!(super::WordHighlightExtension);
 }
 
+/// Unit tests.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,75 +277,118 @@ mod tests {
     #[test]
     fn asset_name_mac_aarch64_is_correct() {
         let name = platform_asset_name(zed::Os::Mac, zed::Architecture::Aarch64);
-        assert_eq!(name, "zed-highlight-lsp-darwin-aarch64.tar.gz");
+        assert_eq!(
+            name, "zed-highlight-lsp-darwin-aarch64.tar.gz",
+            "macOS on aarch64 must map to the `darwin-aarch64` release asset"
+        );
     }
 
     #[test]
     fn asset_name_mac_x86_64_is_correct() {
         let name = platform_asset_name(zed::Os::Mac, zed::Architecture::X8664);
-        assert_eq!(name, "zed-highlight-lsp-darwin-x86_64.tar.gz");
+        assert_eq!(
+            name, "zed-highlight-lsp-darwin-x86_64.tar.gz",
+            "macOS on x86_64 must map to the `darwin-x86_64` release asset"
+        );
     }
 
     #[test]
     fn asset_name_mac_x86_is_correct() {
         let name = platform_asset_name(zed::Os::Mac, zed::Architecture::X86);
-        assert_eq!(name, "zed-highlight-lsp-darwin-x86.tar.gz");
+        assert_eq!(
+            name, "zed-highlight-lsp-darwin-x86.tar.gz",
+            "macOS on x86 must map to the `darwin-x86` asset name"
+        );
     }
 
     #[test]
     fn asset_name_linux_aarch64_is_correct() {
         let name = platform_asset_name(zed::Os::Linux, zed::Architecture::Aarch64);
-        assert_eq!(name, "zed-highlight-lsp-linux-aarch64.tar.gz");
+        assert_eq!(
+            name, "zed-highlight-lsp-linux-aarch64.tar.gz",
+            "Linux on aarch64 must map to the `linux-aarch64` release asset"
+        );
     }
 
     #[test]
     fn asset_name_linux_x86_64_is_correct() {
         let name = platform_asset_name(zed::Os::Linux, zed::Architecture::X8664);
-        assert_eq!(name, "zed-highlight-lsp-linux-x86_64.tar.gz");
+        assert_eq!(
+            name, "zed-highlight-lsp-linux-x86_64.tar.gz",
+            "Linux on x86_64 must map to the `linux-x86_64` release asset"
+        );
     }
 
     #[test]
     fn asset_name_linux_x86_is_correct() {
         let name = platform_asset_name(zed::Os::Linux, zed::Architecture::X86);
-        assert_eq!(name, "zed-highlight-lsp-linux-x86.tar.gz");
+        assert_eq!(
+            name, "zed-highlight-lsp-linux-x86.tar.gz",
+            "Linux on x86 must map to the `linux-x86` asset name"
+        );
     }
 
     #[test]
     fn asset_name_windows_aarch64_is_correct() {
         let name = platform_asset_name(zed::Os::Windows, zed::Architecture::Aarch64);
-        assert_eq!(name, "zed-highlight-lsp-windows-aarch64.tar.gz");
+        assert_eq!(
+            name, "zed-highlight-lsp-windows-aarch64.tar.gz",
+            "Windows on aarch64 must map to the `windows-aarch64` release asset"
+        );
     }
 
     #[test]
     fn asset_name_windows_x86_64_is_correct() {
         let name = platform_asset_name(zed::Os::Windows, zed::Architecture::X8664);
-        assert_eq!(name, "zed-highlight-lsp-windows-x86_64.tar.gz");
+        assert_eq!(
+            name, "zed-highlight-lsp-windows-x86_64.tar.gz",
+            "Windows on x86_64 must map to the `windows-x86_64` release asset"
+        );
     }
 
     #[test]
     fn asset_name_windows_x86_is_correct() {
         let name = platform_asset_name(zed::Os::Windows, zed::Architecture::X86);
-        assert_eq!(name, "zed-highlight-lsp-windows-x86.tar.gz");
+        assert_eq!(
+            name, "zed-highlight-lsp-windows-x86.tar.gz",
+            "Windows on x86 must map to the `windows-x86` asset name"
+        );
     }
 
     // Test `version_dir_name`.
 
     #[test]
     fn version_dir_name_format_is_correct() {
-        assert_eq!(version_dir_name("0.1.0"), "zed-highlight-lsp-0.1.0");
+        assert_eq!(
+            version_dir_name("0.1.0"),
+            "zed-highlight-lsp-0.1.0",
+            "versioned cache directory must be `<binary name>-<version>`"
+        );
     }
 
     // Test `binary_file_name`.
 
     #[test]
     fn binary_file_name_on_unix_has_no_extension() {
-        assert_eq!(binary_file_name(zed::Os::Mac), "zed-highlight-lsp");
-        assert_eq!(binary_file_name(zed::Os::Linux), "zed-highlight-lsp");
+        assert_eq!(
+            binary_file_name(zed::Os::Mac),
+            "zed-highlight-lsp",
+            "macOS binary name must have no extension"
+        );
+        assert_eq!(
+            binary_file_name(zed::Os::Linux),
+            "zed-highlight-lsp",
+            "Linux binary name must have no extension"
+        );
     }
 
     #[test]
     fn binary_file_name_on_windows_has_exe_extension() {
-        assert_eq!(binary_file_name(zed::Os::Windows), "zed-highlight-lsp.exe");
+        assert_eq!(
+            binary_file_name(zed::Os::Windows),
+            "zed-highlight-lsp.exe",
+            "Windows binary name must have the `.exe` extension"
+        );
     }
 
     // Test `binary_path_in_version`.
@@ -352,11 +397,13 @@ mod tests {
     fn binary_path_in_version_format_is_correct_on_unix() {
         assert_eq!(
             binary_path_in_version("0.1.0", zed::Os::Mac),
-            "zed-highlight-lsp-0.1.0/zed-highlight-lsp"
+            "zed-highlight-lsp-0.1.0/zed-highlight-lsp",
+            "macOS binary path must be the extensionless binary inside the versioned directory"
         );
         assert_eq!(
             binary_path_in_version("0.1.0", zed::Os::Linux),
-            "zed-highlight-lsp-0.1.0/zed-highlight-lsp"
+            "zed-highlight-lsp-0.1.0/zed-highlight-lsp",
+            "Linux binary path must be the extensionless binary inside the versioned directory"
         );
     }
 
@@ -367,7 +414,8 @@ mod tests {
         // on every session and then fail to start the LSP because the resolved path doesn't exist.
         assert_eq!(
             binary_path_in_version("0.1.0", zed::Os::Windows),
-            "zed-highlight-lsp-0.1.0/zed-highlight-lsp.exe"
+            "zed-highlight-lsp-0.1.0/zed-highlight-lsp.exe",
+            "Windows binary path must include the `.exe` suffix inside the versioned directory"
         );
     }
 

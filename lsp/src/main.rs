@@ -195,8 +195,8 @@ impl Backend {
             handle.abort();
         }
 
-        // Send the refresh request to Zed. Errors are deliberately ignored: the refresh is best-effort (e.g., it fails if
-        // the client has disconnected) and there is no fallback to try. If it fails, a toggle or clear only becomes
+        // Send the refresh request to Zed. Errors are deliberately ignored: the refresh is best-effort (e.g., it fails
+        // if the client has disconnected) and there is no fallback to try. If it fails, a toggle or clear only becomes
         // visible once Zed re-requests tokens on its own (e.g., after the next edit).
         _ = self.client.semantic_tokens_refresh().await;
     }
@@ -216,8 +216,8 @@ impl Backend {
         let client = self.client.clone();
         *guard = Some(tokio::spawn(async move {
             time::sleep(Duration::from_millis(DEBOUNCE_DELAY_MS)).await;
-            // Errors are deliberately ignored: this refresh always follows an edit, after which Zed re-requests tokens on
-            // its own anyway.
+            // Errors are deliberately ignored: this refresh always follows an edit, after which Zed re-requests tokens
+            // on its own anyway.
             _ = client.semantic_tokens_refresh().await;
         }));
     }
@@ -769,6 +769,8 @@ mod tests {
 
     // Helper functions.
 
+    /// Builds a [`Range`] from `start_line`/`start_char` to `end_line`/`end_char` (character offsets in UTF-16 code
+    /// units, as in LSP).
     fn make_range(start_line: u32, start_char: u32, end_line: u32, end_char: u32) -> Range {
         Range {
             start: Position {
@@ -782,6 +784,7 @@ mod tests {
         }
     }
 
+    /// Builds an empty [`Range`] at `line`/`character`, i.e., a bare cursor with no selection.
     fn cursor_range(line: u32, character: u32) -> Range {
         make_range(line, character, line, character)
     }
@@ -791,13 +794,19 @@ mod tests {
     #[test]
     fn state_default_has_empty_word_list() {
         let state = State::default();
-        assert!(state.words.is_empty());
+        assert!(
+            state.words.is_empty(),
+            "a fresh state must have no highlighted words"
+        );
     }
 
     #[test]
     fn state_default_has_empty_docs() {
         let state = State::default();
-        assert!(state.docs.is_empty());
+        assert!(
+            state.docs.is_empty(),
+            "a fresh state must have no open documents"
+        );
     }
 
     #[test]
@@ -815,7 +824,11 @@ mod tests {
     fn state_toggle_adds_new_word() {
         let mut state = State::default();
         state.toggle("foo");
-        assert_eq!(state.words, vec![Some("foo".to_owned())]);
+        assert_eq!(
+            state.words,
+            vec![Some("foo".to_owned())],
+            "toggling a new word must append it to the list"
+        );
     }
 
     #[test]
@@ -823,7 +836,11 @@ mod tests {
         let mut state = State::default();
         state.toggle("foo");
         state.toggle("foo");
-        assert_eq!(state.words, vec![None]);
+        assert_eq!(
+            state.words,
+            vec![None],
+            "toggling a highlighted word off must leave a `None` slot instead of shrinking the list"
+        );
     }
 
     #[test]
@@ -832,7 +849,11 @@ mod tests {
         state.toggle("foo"); // slot 0 = Some("foo")
         state.toggle("foo"); // slot 0 = None
         state.toggle("bar"); // should reuse slot 0, not grow
-        assert_eq!(state.words, vec![Some("bar".to_owned())]);
+        assert_eq!(
+            state.words,
+            vec![Some("bar".to_owned())],
+            "a new word must reuse the first free slot instead of growing the list"
+        );
     }
 
     #[test]
@@ -840,8 +861,15 @@ mod tests {
         let mut state = State::default();
         state.toggle("a");
         state.toggle("b");
-        assert_eq!(state.words.len(), 2);
-        assert!(state.words.iter().all(Option::is_some));
+        assert_eq!(
+            state.words.len(),
+            2,
+            "two distinct words must occupy two slots"
+        );
+        assert!(
+            state.words.iter().all(Option::is_some),
+            "both slots must be occupied when no word was removed"
+        );
     }
 
     #[test]
@@ -851,7 +879,11 @@ mod tests {
         state.toggle("b");
         state.toggle("a"); // soft-delete "a"
         assert!(state.words[0].is_none(), "removed slot must be `None`");
-        assert_eq!(state.words[1], Some("b".to_owned()));
+        assert_eq!(
+            state.words[1],
+            Some("b".to_owned()),
+            "removing a word must not shift the slots of the other words"
+        );
     }
 
     #[test]
@@ -870,7 +902,10 @@ mod tests {
 
     #[test]
     fn state_has_any_false_when_empty() {
-        assert!(!State::default().has_any());
+        assert!(
+            !State::default().has_any(),
+            "a fresh state must have no active highlights"
+        );
     }
 
     #[test]
@@ -878,14 +913,20 @@ mod tests {
         let mut state = State::default();
         state.toggle("a");
         state.toggle("a");
-        assert!(!state.has_any());
+        assert!(
+            !state.has_any(),
+            "a list of only `None` slots must count as no active highlights"
+        );
     }
 
     #[test]
     fn state_has_any_true_when_at_least_one_word_present() {
         let mut state = State::default();
         state.toggle("a");
-        assert!(state.has_any());
+        assert!(
+            state.has_any(),
+            "one highlighted word must count as an active highlight"
+        );
     }
 
     #[test]
@@ -894,7 +935,10 @@ mod tests {
         state.toggle("a");
         state.toggle("b");
         state.toggle("a"); // remove "a", keep "b"
-        assert!(state.has_any());
+        assert!(
+            state.has_any(),
+            "a remaining word next to a `None` slot must still count as an active highlight"
+        );
     }
 
     // Test `State::words_clear`.
@@ -905,7 +949,10 @@ mod tests {
         state.toggle("a");
         state.toggle("b");
         state.words_clear();
-        assert!(state.words.is_empty());
+        assert!(
+            state.words.is_empty(),
+            "clearing must drop every slot, not just set them to `None`"
+        );
     }
 
     #[test]
@@ -913,7 +960,7 @@ mod tests {
         let mut state = State::default();
         state.toggle("a");
         state.words_clear();
-        assert!(!state.has_any());
+        assert!(!state.has_any(), "clearing must leave no active highlights");
     }
 
     // Test `State::words_eq`.
@@ -921,144 +968,238 @@ mod tests {
     #[test]
     fn state_words_eq_identical_strings() {
         let state = State::default();
-        assert!(state.words_eq("hello", "hello"));
+        assert!(
+            state.words_eq("hello", "hello"),
+            "identical words must compare equal"
+        );
     }
 
     #[test]
     fn state_words_eq_case_sensitive_by_default() {
         let state = State::default();
-        assert!(!state.words_eq("Foo", "foo"));
+        assert!(
+            !state.words_eq("Foo", "foo"),
+            "words differing only in case must not compare equal by default"
+        );
     }
 
     #[test]
     fn state_words_eq_case_insensitive_when_flag_set() {
         let mut state = State::default();
         state.options.ignore_case = true;
-        assert!(state.words_eq("Foo", "foo"));
-        assert!(state.words_eq("FOO", "foo"));
+        assert!(
+            state.words_eq("Foo", "foo"),
+            "mixed-case words must compare equal when `ignore_case` is set"
+        );
+        assert!(
+            state.words_eq("FOO", "foo"),
+            "uppercase and lowercase words must compare equal when `ignore_case` is set"
+        );
     }
 
     #[test]
     fn state_words_eq_different_words_always_false() {
         let mut state = State::default();
-        assert!(!state.words_eq("foo", "bar"));
+        assert!(
+            !state.words_eq("foo", "bar"),
+            "different words must not compare equal in case-sensitive mode"
+        );
         state.options.ignore_case = true;
-        assert!(!state.words_eq("foo", "bar"));
+        assert!(
+            !state.words_eq("foo", "bar"),
+            "different words must not compare equal in case-insensitive mode"
+        );
     }
 
     // Test `utf16_len`.
 
     #[test]
     fn utf16_len_empty_string_is_zero() {
-        assert_eq!(utf16_len(""), 0);
+        assert_eq!(
+            utf16_len(""),
+            0,
+            "the empty string must have no UTF-16 code units"
+        );
     }
 
     #[test]
     fn utf16_len_ascii_counts_one_per_char() {
-        assert_eq!(utf16_len("hello"), 5);
+        assert_eq!(
+            utf16_len("hello"),
+            5,
+            "each ASCII char must count as one UTF-16 code unit"
+        );
     }
 
     #[test]
     fn utf16_len_bmp_multibyte_char_counts_one() {
         // '£' is U+00A3: 2 UTF-8 bytes, 1 UTF-16 code unit.
-        assert_eq!(utf16_len("£"), 1);
+        assert_eq!(
+            utf16_len("£"),
+            1,
+            "'£' must count as one UTF-16 code unit despite being two UTF-8 bytes"
+        );
         // '中' is U+4E2D: 3 UTF-8 bytes, 1 UTF-16 code unit.
-        assert_eq!(utf16_len("中文"), 2);
+        assert_eq!(
+            utf16_len("中文"),
+            2,
+            "each CJK char must count as one UTF-16 code unit despite being three UTF-8 bytes"
+        );
     }
 
     #[test]
     fn utf16_len_supplementary_char_counts_two() {
         // '😀' is U+1F600: 4 UTF-8 bytes, 2 UTF-16 code units (surrogate pair).
-        assert_eq!(utf16_len("😀"), 2);
+        assert_eq!(
+            utf16_len("😀"),
+            2,
+            "'😀' must count as two UTF-16 code units (a surrogate pair)"
+        );
     }
 
     #[test]
     fn utf16_len_mixed_content() {
         // "a😀b" = 1 + 2 + 1 = 4 UTF-16 code units.
-        assert_eq!(utf16_len("a😀b"), 4);
+        assert_eq!(
+            utf16_len("a😀b"),
+            4,
+            "mixed text must sum the UTF-16 code units of each char"
+        );
     }
 
     // Test `utf16_to_byte`.
 
     #[test]
     fn utf16_to_byte_offset_zero_is_string_start() {
-        assert_eq!(utf16_to_byte("hello", 0), Some(0));
+        assert_eq!(
+            utf16_to_byte("hello", 0),
+            Some(0),
+            "UTF-16 offset 0 must map to byte 0"
+        );
     }
 
     #[test]
     fn utf16_to_byte_ascii_offsets_equal_byte_offsets() {
-        assert_eq!(utf16_to_byte("hello", 3), Some(3));
+        assert_eq!(
+            utf16_to_byte("hello", 3),
+            Some(3),
+            "ASCII UTF-16 offsets must equal byte offsets"
+        );
     }
 
     #[test]
     fn utf16_to_byte_offset_at_end_of_string() {
-        assert_eq!(utf16_to_byte("hello", 5), Some(5));
+        assert_eq!(
+            utf16_to_byte("hello", 5),
+            Some(5),
+            "the UTF-16 length must map to the byte length (end of string)"
+        );
     }
 
     #[test]
     fn utf16_to_byte_offset_past_end_returns_none() {
-        assert_eq!(utf16_to_byte("hello", 6), None);
+        assert_eq!(
+            utf16_to_byte("hello", 6),
+            None,
+            "an offset past the end of the string must be rejected"
+        );
     }
 
     #[test]
     fn utf16_to_byte_bmp_multibyte_char() {
         // "£a": '£' occupies 1 UTF-16 unit but 2 UTF-8 bytes.
         // UTF-16 offset 1 -> byte offset 2.
-        assert_eq!(utf16_to_byte("£a", 1), Some(2));
+        assert_eq!(
+            utf16_to_byte("£a", 1),
+            Some(2),
+            "the offset after '£' must skip both of its UTF-8 bytes"
+        );
         // UTF-16 offset 2 -> byte offset 3 (end of string).
-        assert_eq!(utf16_to_byte("£a", 2), Some(3));
+        assert_eq!(
+            utf16_to_byte("£a", 2),
+            Some(3),
+            "the end offset of \"£a\" must map to its byte length"
+        );
     }
 
     #[test]
     fn utf16_to_byte_surrogate_pair() {
         // "😀a": '😀' occupies 2 UTF-16 units but 4 UTF-8 bytes.
         // UTF-16 offset 2 -> byte offset 4.
-        assert_eq!(utf16_to_byte("😀a", 2), Some(4));
+        assert_eq!(
+            utf16_to_byte("😀a", 2),
+            Some(4),
+            "the offset after '😀' must skip all four of its UTF-8 bytes"
+        );
     }
 
     #[test]
     fn utf16_to_byte_inside_surrogate_pair_is_none() {
         // "😀a": '😀' occupies 2 UTF-16 units but 4 UTF-8 bytes.
         // UTF-16 offset 1 -> lands inside the surrogate pair.
-        assert_eq!(utf16_to_byte("😀a", 1), None);
+        assert_eq!(
+            utf16_to_byte("😀a", 1),
+            None,
+            "an offset inside a surrogate pair must be rejected"
+        );
     }
 
     #[test]
     fn utf16_to_byte_empty_string_offset_zero() {
-        assert_eq!(utf16_to_byte("", 0), Some(0));
+        assert_eq!(
+            utf16_to_byte("", 0),
+            Some(0),
+            "offset 0 of the empty string must map to byte 0"
+        );
     }
 
     #[test]
     fn utf16_to_byte_empty_string_nonzero_is_none() {
-        assert_eq!(utf16_to_byte("", 1), None);
+        assert_eq!(
+            utf16_to_byte("", 1),
+            None,
+            "any nonzero offset into the empty string must be rejected"
+        );
     }
 
     // Test `is_word_char`.
 
     #[test]
     fn is_word_char_ascii_letters() {
-        assert!(is_word_char('a'));
-        assert!(is_word_char('z'));
-        assert!(is_word_char('A'));
-        assert!(is_word_char('Z'));
+        assert!(
+            is_word_char('a'),
+            "lowercase ASCII letters must be word chars"
+        );
+        assert!(
+            is_word_char('z'),
+            "lowercase ASCII letters must be word chars"
+        );
+        assert!(
+            is_word_char('A'),
+            "uppercase ASCII letters must be word chars"
+        );
+        assert!(
+            is_word_char('Z'),
+            "uppercase ASCII letters must be word chars"
+        );
     }
 
     #[test]
     fn is_word_char_digits() {
-        assert!(is_word_char('0'));
-        assert!(is_word_char('9'));
+        assert!(is_word_char('0'), "ASCII digits must be word chars");
+        assert!(is_word_char('9'), "ASCII digits must be word chars");
     }
 
     #[test]
     fn is_word_char_underscore() {
-        assert!(is_word_char('_'));
+        assert!(is_word_char('_'), "'_' must be a word char");
     }
 
     #[test]
     fn is_word_char_space_is_false() {
-        assert!(!is_word_char(' '));
-        assert!(!is_word_char('\t'));
-        assert!(!is_word_char('\n'));
+        assert!(!is_word_char(' '), "a space must not be a word char");
+        assert!(!is_word_char('\t'), "a tab must not be a word char");
+        assert!(!is_word_char('\n'), "a newline must not be a word char");
     }
 
     #[test]
@@ -1074,66 +1215,144 @@ mod tests {
 
     #[test]
     fn is_highlightable_empty_string_always_false() {
-        assert!(!is_highlightable("", SUBSTRING));
-        assert!(!is_highlightable("", WHOLE_WORD));
+        assert!(
+            !is_highlightable("", SUBSTRING),
+            "the empty string must not be highlightable in substring mode"
+        );
+        assert!(
+            !is_highlightable("", WHOLE_WORD),
+            "the empty string must not be highlightable in whole-word mode"
+        );
     }
 
     #[test]
     fn is_highlightable_nonword_chars_in_whole_word_mode_false() {
-        assert!(!is_highlightable(".", WHOLE_WORD));
-        assert!(!is_highlightable("()", WHOLE_WORD));
+        assert!(
+            !is_highlightable(".", WHOLE_WORD),
+            "a lone punctuation char must not be highlightable in whole-word mode"
+        );
+        assert!(
+            !is_highlightable("()", WHOLE_WORD),
+            "punctuation-only text must not be highlightable in whole-word mode"
+        );
     }
 
     #[test]
     fn is_highlightable_any_nonempty_without_whole_word_mode_true() {
-        assert!(is_highlightable("foo", SUBSTRING));
-        assert!(is_highlightable("(bar)", SUBSTRING));
-        assert!(is_highlightable("foo bar", SUBSTRING));
+        assert!(
+            is_highlightable("foo", SUBSTRING),
+            "an identifier must be highlightable in substring mode"
+        );
+        assert!(
+            is_highlightable("(bar)", SUBSTRING),
+            "text with surrounding punctuation must be highlightable in substring mode"
+        );
+        assert!(
+            is_highlightable("foo bar", SUBSTRING),
+            "text containing a space must be highlightable in substring mode"
+        );
     }
 
     #[test]
     fn is_highlightable_identifier_in_whole_word_mode_true() {
-        assert!(is_highlightable("foo", WHOLE_WORD));
-        assert!(is_highlightable("foo_bar", WHOLE_WORD));
-        assert!(is_highlightable("foo123", WHOLE_WORD));
-        assert!(is_highlightable("_private", WHOLE_WORD));
+        assert!(
+            is_highlightable("foo", WHOLE_WORD),
+            "a plain identifier must be highlightable in whole-word mode"
+        );
+        assert!(
+            is_highlightable("foo_bar", WHOLE_WORD),
+            "an identifier with an inner underscore must be highlightable in whole-word mode"
+        );
+        assert!(
+            is_highlightable("foo123", WHOLE_WORD),
+            "an identifier ending in digits must be highlightable in whole-word mode"
+        );
+        assert!(
+            is_highlightable("_private", WHOLE_WORD),
+            "an identifier starting with an underscore must be highlightable in whole-word mode"
+        );
     }
 
     #[test]
     fn is_highlightable_leading_nonword_char_in_whole_word_mode_false() {
-        assert!(!is_highlightable("(foo", WHOLE_WORD));
-        assert!(!is_highlightable(".foo", WHOLE_WORD));
-        assert!(!is_highlightable(" foo", WHOLE_WORD));
+        assert!(
+            !is_highlightable("(foo", WHOLE_WORD),
+            "a leading '(' must make text non-highlightable in whole-word mode"
+        );
+        assert!(
+            !is_highlightable(".foo", WHOLE_WORD),
+            "a leading '.' must make text non-highlightable in whole-word mode"
+        );
+        assert!(
+            !is_highlightable(" foo", WHOLE_WORD),
+            "a leading space must make text non-highlightable in whole-word mode"
+        );
     }
 
     #[test]
     fn is_highlightable_trailing_nonword_char_in_whole_word_mode_false() {
-        assert!(!is_highlightable("foo(", WHOLE_WORD));
-        assert!(!is_highlightable("foo.", WHOLE_WORD));
-        assert!(!is_highlightable("foo ", WHOLE_WORD));
+        assert!(
+            !is_highlightable("foo(", WHOLE_WORD),
+            "a trailing '(' must make text non-highlightable in whole-word mode"
+        );
+        assert!(
+            !is_highlightable("foo.", WHOLE_WORD),
+            "a trailing '.' must make text non-highlightable in whole-word mode"
+        );
+        assert!(
+            !is_highlightable("foo ", WHOLE_WORD),
+            "a trailing space must make text non-highlightable in whole-word mode"
+        );
     }
 
     #[test]
     fn is_highlightable_middle_nonword_char_always_true() {
-        assert!(is_highlightable("foo.bar", WHOLE_WORD));
-        assert!(is_highlightable("foo.bar", SUBSTRING));
+        assert!(
+            is_highlightable("foo.bar", WHOLE_WORD),
+            "an inner non-word char must not matter in whole-word mode"
+        );
+        assert!(
+            is_highlightable("foo.bar", SUBSTRING),
+            "an inner non-word char must not matter in substring mode"
+        );
     }
 
     #[test]
     fn is_highlightable_single_word_char_true() {
-        assert!(is_highlightable("x", WHOLE_WORD));
-        assert!(is_highlightable("_", WHOLE_WORD));
-        assert!(is_highlightable("1", WHOLE_WORD));
+        assert!(
+            is_highlightable("x", WHOLE_WORD),
+            "a single letter must be highlightable in whole-word mode"
+        );
+        assert!(
+            is_highlightable("_", WHOLE_WORD),
+            "a single '_' must be highlightable in whole-word mode"
+        );
+        assert!(
+            is_highlightable("1", WHOLE_WORD),
+            "a single digit must be highlightable in whole-word mode"
+        );
     }
 
     // TODO: The behavior of `is_highlightable` without whole-word mode with non-word characters is somewhat debatable.
     // We should probably refine it if `whole_word` ever becomes user-configurable. Leave as-is for the time being.
     #[test]
     fn is_highlightable_any_nonempty_selection_without_whole_word_mode_true() {
-        assert!(is_highlightable(" ", SUBSTRING));
-        assert!(is_highlightable(".", SUBSTRING));
-        assert!(is_highlightable("()", SUBSTRING));
-        assert!(is_highlightable("foo bar", SUBSTRING));
+        assert!(
+            is_highlightable(" ", SUBSTRING),
+            "a lone space must be highlightable in substring mode"
+        );
+        assert!(
+            is_highlightable(".", SUBSTRING),
+            "a lone punctuation char must be highlightable in substring mode"
+        );
+        assert!(
+            is_highlightable("()", SUBSTRING),
+            "punctuation-only text must be highlightable in substring mode"
+        );
+        assert!(
+            is_highlightable("foo bar", SUBSTRING),
+            "text containing a space must be highlightable in substring mode"
+        );
     }
 
     // Test `compile_word_regex`.
@@ -1224,22 +1443,25 @@ mod tests {
     #[test]
     fn compile_word_regex_escapes_special_chars() {
         let mut re = compile_word_regex("foo.bar", SUBSTRING).unwrap();
-        assert!(re.is_match("foo.bar"));
+        assert!(re.is_match("foo.bar"), "an escaped '.' must match itself");
         assert!(
             !re.is_match("fooXbar"),
             "dot must match literally, not as any-char"
         );
 
         re = compile_word_regex("foo()", SUBSTRING).unwrap();
-        assert!(re.is_match("foo()"));
+        assert!(
+            re.is_match("foo()"),
+            "escaped parentheses must match themselves"
+        );
         assert!(!re.is_match("foo"), "parentheses are not optional");
 
         re = compile_word_regex("a*b", SUBSTRING).unwrap();
-        assert!(re.is_match("a*b"));
+        assert!(re.is_match("a*b"), "an escaped '*' must match itself");
         assert!(!re.is_match("ab"), "star must be literal, not a quantifier");
 
         re = compile_word_regex("a+b", SUBSTRING).unwrap();
-        assert!(re.is_match("a+b"));
+        assert!(re.is_match("a+b"), "an escaped '+' must match itself");
         assert!(!re.is_match("ab"), "plus must be literal, not a quantifier");
         assert!(
             !re.is_match("aab"),
@@ -1247,7 +1469,7 @@ mod tests {
         );
 
         re = compile_word_regex("a?b", SUBSTRING).unwrap();
-        assert!(re.is_match("a?b"));
+        assert!(re.is_match("a?b"), "an escaped '?' must match itself");
         assert!(
             !re.is_match("ab"),
             "question mark must be literal, not optional"
@@ -1258,7 +1480,7 @@ mod tests {
         );
 
         re = compile_word_regex("a|b", SUBSTRING).unwrap();
-        assert!(re.is_match("a|b"));
+        assert!(re.is_match("a|b"), "an escaped '|' must match itself");
         assert!(!re.is_match("a"), "pipe must be literal, not alternation");
         assert!(!re.is_match("b"), "pipe must be literal, not alternation");
     }
@@ -1267,47 +1489,67 @@ mod tests {
 
     #[test]
     fn matches_anywhere_finds_word_in_content() {
-        assert!(matches_anywhere("let foo = 1;", "foo", WHOLE_WORD));
+        assert!(
+            matches_anywhere("let foo = 1;", "foo", WHOLE_WORD),
+            "a word present in the content must match"
+        );
     }
 
     #[test]
     fn matches_anywhere_returns_false_for_absent_word() {
-        assert!(!matches_anywhere("let foo = 1;", "bar", WHOLE_WORD));
+        assert!(
+            !matches_anywhere("let foo = 1;", "bar", WHOLE_WORD),
+            "a word absent from the content must not match"
+        );
     }
 
     #[test]
     fn matches_anywhere_whole_word_rejects_substring() {
-        assert!(!matches_anywhere("format!()", "for", WHOLE_WORD));
+        assert!(
+            !matches_anywhere("format!()", "for", WHOLE_WORD),
+            "whole-word mode must not match `for` inside `format`"
+        );
     }
 
     #[test]
     fn matches_anywhere_non_whole_word_finds_substring() {
-        assert!(matches_anywhere("format!()", "for", SUBSTRING));
+        assert!(
+            matches_anywhere("format!()", "for", SUBSTRING),
+            "substring mode must match `for` inside `format`"
+        );
     }
 
     #[test]
     fn matches_anywhere_case_insensitive_finds_match() {
-        assert!(matches_anywhere(
-            "let Foo = 1;",
-            "foo",
-            SUBSTRING_IGNORE_CASE
-        ));
+        assert!(
+            matches_anywhere("let Foo = 1;", "foo", SUBSTRING_IGNORE_CASE),
+            "case-insensitive mode must match a word that differs only in case"
+        );
     }
 
     #[test]
     fn matches_anywhere_multiline_content_any_line() {
         let content = "line one\nfoo here\nline three";
-        assert!(matches_anywhere(content, "foo", WHOLE_WORD));
+        assert!(
+            matches_anywhere(content, "foo", WHOLE_WORD),
+            "a word on a later line must match"
+        );
     }
 
     #[test]
     fn matches_anywhere_empty_content_returns_false() {
-        assert!(!matches_anywhere("", "foo", WHOLE_WORD));
+        assert!(
+            !matches_anywhere("", "foo", WHOLE_WORD),
+            "empty content must never match"
+        );
     }
 
     #[test]
     fn matches_anywhere_word_not_on_this_line_returns_false() {
-        assert!(!matches_anywhere("line one\nline two", "three", WHOLE_WORD));
+        assert!(
+            !matches_anywhere("line one\nline two", "three", WHOLE_WORD),
+            "a word absent from every line must not match"
+        );
     }
 
     #[test]
@@ -1328,14 +1570,22 @@ mod tests {
     fn word_at_selection_returns_selected_text() {
         // "let foo = 1;" - select "foo" at UTF-16 chars 4..7.
         let range = make_range(0, 4, 0, 7);
-        assert_eq!(word_at("let foo = 1;", range), Some("foo".to_owned()));
+        assert_eq!(
+            word_at("let foo = 1;", range),
+            Some("foo".to_owned()),
+            "a selection must be returned verbatim"
+        );
     }
 
     #[test]
     fn word_at_selection_trims_surrounding_whitespace() {
         // "let foo = 1;" - select " foo " at chars 3..8.
         let range = make_range(0, 3, 0, 8);
-        assert_eq!(word_at("let foo = 1;", range), Some("foo".to_owned()));
+        assert_eq!(
+            word_at("let foo = 1;", range),
+            Some("foo".to_owned()),
+            "whitespace around a selection must be trimmed"
+        );
     }
 
     #[test]
@@ -1344,7 +1594,8 @@ mod tests {
         let range = make_range(0, 4, 0, 11);
         assert_eq!(
             word_at("let foo.bar = 1;", range),
-            Some("foo.bar".to_owned())
+            Some("foo.bar".to_owned()),
+            "a selection may contain inner non-word chars"
         );
     }
 
@@ -1353,7 +1604,8 @@ mod tests {
         // "hello world" - cursor on 'o' (char 4) -> word "hello".
         assert_eq!(
             word_at("hello world", cursor_range(0, 4)),
-            Some("hello".to_owned())
+            Some("hello".to_owned()),
+            "a cursor inside a word must expand to the whole word"
         );
     }
 
@@ -1361,20 +1613,29 @@ mod tests {
     fn word_at_cursor_at_start_of_word() {
         assert_eq!(
             word_at("hello world", cursor_range(0, 0)),
-            Some("hello".to_owned())
+            Some("hello".to_owned()),
+            "a cursor on a word's first char must expand to the whole word"
         );
     }
 
     #[test]
     fn word_at_cursor_just_past_word_end_is_none() {
         // char 5 in "hello world" is the space between the words.
-        assert_eq!(word_at("hello world", cursor_range(0, 5)), None);
+        assert_eq!(
+            word_at("hello world", cursor_range(0, 5)),
+            None,
+            "a cursor just past a word's end (on a space) must yield no word"
+        );
     }
 
     #[test]
     fn word_at_cursor_on_punctuation_is_none() {
         // "foo(bar)" - char 3 is '('.
-        assert_eq!(word_at("foo(bar)", cursor_range(0, 3)), None);
+        assert_eq!(
+            word_at("foo(bar)", cursor_range(0, 3)),
+            None,
+            "a cursor on punctuation must yield no word"
+        );
     }
 
     #[test]
@@ -1382,14 +1643,19 @@ mod tests {
         // "some_var = 1;" - cursor on 'v' (char 5).
         assert_eq!(
             word_at("some_var = 1;", cursor_range(0, 5)),
-            Some("some_var".to_owned())
+            Some("some_var".to_owned()),
+            "underscores must be part of the word under the cursor"
         );
     }
 
     #[test]
     fn word_at_single_char_word() {
         // "a b" - cursor on 'a' (char 0) -> word "a".
-        assert_eq!(word_at("a b", cursor_range(0, 0)), Some("a".to_owned()));
+        assert_eq!(
+            word_at("a b", cursor_range(0, 0)),
+            Some("a".to_owned()),
+            "a one-char word must be found"
+        );
     }
 
     #[test]
@@ -1397,7 +1663,8 @@ mod tests {
         // "hello" with no trailing space - the right-scan must not overshoot the string end.
         assert_eq!(
             word_at("hello", cursor_range(0, 0)),
-            Some("hello".to_owned())
+            Some("hello".to_owned()),
+            "the word must extend to the end of the line when nothing follows it"
         );
     }
 
@@ -1407,13 +1674,18 @@ mod tests {
         // line 1, char 0 -> 's' in "second".
         assert_eq!(
             word_at(content, cursor_range(1, 0)),
-            Some("second".to_owned())
+            Some("second".to_owned()),
+            "the cursor line must select the word on that line"
         );
     }
 
     #[test]
     fn word_at_nonexistent_line_is_none() {
-        assert_eq!(word_at("one line only", cursor_range(99, 0)), None);
+        assert_eq!(
+            word_at("one line only", cursor_range(99, 0)),
+            None,
+            "a cursor on a line past the end of the document must yield no word"
+        );
     }
 
     #[test]
@@ -1422,7 +1694,11 @@ mod tests {
         // Line 0 char 4 is 'f' in "foo".
         let content = "let foo = 1;\nbar baz";
         let range = make_range(0, 4, 1, 3);
-        assert_eq!(word_at(content, range), Some("foo".to_owned()));
+        assert_eq!(
+            word_at(content, range),
+            Some("foo".to_owned()),
+            "a multi-line selection must fall back to the word at its start"
+        );
     }
 
     #[test]
@@ -1430,27 +1706,43 @@ mod tests {
         // "中文 hello" - '中' and '文' are each 1 UTF-16 unit (3 UTF-8 bytes).
         // "hello" starts at UTF-16 offset 3, ends at offset 8.
         let range = make_range(0, 3, 0, 8);
-        assert_eq!(word_at("中文 hello", range), Some("hello".to_owned()));
+        assert_eq!(
+            word_at("中文 hello", range),
+            Some("hello".to_owned()),
+            "UTF-16 selection offsets must be converted past multibyte chars"
+        );
     }
 
     #[test]
     fn word_at_cursor_after_surrogate_pair() {
         // "😀foo" - emoji is 2 UTF-16 units; 'f' starts at UTF-16 offset 2.
-        assert_eq!(word_at("😀foo", cursor_range(0, 2)), Some("foo".to_owned()));
+        assert_eq!(
+            word_at("😀foo", cursor_range(0, 2)),
+            Some("foo".to_owned()),
+            "UTF-16 cursor offsets must account for surrogate pairs"
+        );
     }
 
     #[test]
     fn word_at_empty_selection_text_after_trim_is_none() {
         // Selecting only whitespace (e.g., a space) should yield None.
         let range = make_range(0, 3, 0, 4); // the space in "foo bar"
-        assert_eq!(word_at("foo bar", range), None);
+        assert_eq!(
+            word_at("foo bar", range),
+            None,
+            "a whitespace-only selection must yield no word"
+        );
     }
 
     #[test]
     fn word_at_unicode_alphanumeric_char() {
         // "café": 'é' (U+00E9) is alphanumeric, so it's a word character. Cursor at UTF-16
         // offset 3 (on 'é') must return the full word "café".
-        assert_eq!(word_at("café", cursor_range(0, 3)), Some("café".to_owned()));
+        assert_eq!(
+            word_at("café", cursor_range(0, 3)),
+            Some("café".to_owned()),
+            "non-ASCII letters must be part of the word under the cursor"
+        );
     }
 }
 
