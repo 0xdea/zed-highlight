@@ -51,7 +51,7 @@ The workspace `[lints]` table in `Cargo.toml` enables clippy `all`, `pedantic`, 
 - Avoid bare arithmetic under `#[expect(clippy::arithmetic_side_effects)]`: prefer code that needs no arithmetic at all, then `saturating_*` for counters, and `checked_*` (with `?` or `let ... else`) when overflow is an error. Keep a bare operation under `#[expect]` only when it provably cannot overflow and the arithmetic-free alternatives cost clarity or performance (e.g., `word_at`); the `reason` must state why it cannot overflow.
 - `pattern_type_mismatch` is allowed, so Rust's default binding modes (implicit match ergonomics) are fine.
 - `shadow_reuse` is allowed: shadow a variable for a clear transformation of the same value (e.g., `let word = ...; if let Some(word) = word { ... }`). `shadow_unrelated` stays on, so never reuse a name for an unrelated value.
-- `min_ident_chars` is on — no single-character identifiers (`ch`, `idx`, `err`, `word`, not `c`, `i`, `e`, `w`). Clippy's default exemptions (`i`, `j`, `n`, `w`, `x`, `y`, `z`) are not used either; single-char lifetimes (`'a`) are fine.
+- `min_ident_chars` is on — no single-character identifiers (`ch`, `idx`, `err`, `word`, not `c`, `e`, `s`). Clippy's default exemptions (`i`, `j`, `n`, `w`, `x`, `y`, `z`) and single-char lifetimes (`'a`) are fine.
 - `ref_patterns` is on — don't write `ref x` in patterns. Use `.as_ref()` or `.as_deref()` on the expression side instead so the pattern binds a plain reference without the `ref` keyword.
 - `if_then_some_else_none` is on — replace `if cond { Some(v) } else { None }` with `.then_some(v)` (when `v` is cheap/trivial) or `.then(|| v)` (when `v` allocates or has side effects).
 
@@ -63,7 +63,7 @@ The workspace `[lints]` table in `Cargo.toml` enables clippy `all`, `pedantic`, 
 
 ### LSP side (`lsp/src/main.rs`)
 
-State model: a single shared `State` (behind `tokio::sync::Mutex`) holds the list of highlighted words, a `HashMap<Url, Arc<str>>` of full document contents, and two matching-mode flags (`whole_word: bool`, `ignore_case: bool`). Highlights are global across all open documents — toggling a word in one file affects all files.
+State model: a single shared `State` (behind `tokio::sync::Mutex`) holds the list of highlighted words, a `HashMap<Url, Arc<str>>` of full document contents, and the matching rules as a `Copy` `MatchOptions { whole_word, ignore_case }` struct. Highlights are global across all open documents — toggling a word in one file affects all files.
 
 Word slot semantics: `words: Vec<Option<String>>`. Soft-delete leaves `None` in place so existing colors don't shift when a word is removed; new words reuse the first `None` slot before growing the Vec. The visible color index is `slot_index % NUM_COLORS` (8), so a 9th simultaneous highlight reuses color 0.
 
@@ -71,11 +71,11 @@ Refresh model: state changes don't push tokens directly. They call either `immed
 
 Token encoding: `build_tokens` collects absolute `(line, start, length, token_type)` matches, sorts them, then converts to the LSP delta encoding (`delta_start` resets to absolute whenever `delta_line > 0`). Character offsets are in **UTF-16 code units** per the LSP spec — see `utf16_len` and `utf16_to_byte`. Don't accidentally use byte offsets when interacting with `Range`/`Position`.
 
-Matching: words are compiled to a `Regex` via `compile_word_regex`, which reads `whole_word` and `ignore_case` from `State`. They default to `whole_word = true`, `ignore_case = false`. `whole_word` uses `\b<escaped>\b`, which means a candidate whose first/last char isn't a word char would compile to a never-matching regex — `is_highlightable` filters those out at the code-action layer so they never enter `words` invisibly. `matches_anywhere` checks the current document before exposing the toggle action so we don't offer a no-op.
+Matching: words are compiled to a `Regex` via `compile_word_regex`, which takes the current `MatchOptions` from `State` (as do `is_highlightable` and `matches_anywhere`); pass the struct rather than individual `bool`s. `build_tokens` and `code_action` copy it out and release the lock before scanning; `execute_command` reads it under the lock, because the highlightable check and the toggle must be atomic. `MatchOptions::default()` is `whole_word = true`, `ignore_case = false`. `whole_word` uses `\b<escaped>\b`, which means a candidate whose first/last char isn't a word char would compile to a never-matching regex — `is_highlightable` filters those out at the code-action layer so they never enter `words` invisibly. `matches_anywhere` checks the current document before exposing the toggle action so we don't offer a no-op.
 
 Word resolution: `word_at` handles two cases — non-empty single-line selection uses the selection verbatim; cursor-only (or multi-line selection) scans `\w`-class chars left/right from the cursor. "Word char" is `is_alphanumeric() || '_'`.
 
-Commands: only two are registered with Zed (`zed-highlight.toggle`, `zed-highlight.clear`). Both are surfaced via `code_action`, not bound to keymaps — users invoke them via `editor: toggle code actions` (`⌘.`/`Ctrl+.`).
+Commands: only two are registered with Zed (`zed-highlight.toggle`, `zed-highlight.clear`), defined once as the `TOGGLE_COMMAND` / `CLEAR_COMMAND` consts. The integration tests deliberately keep the literal strings to pin the wire names. Both are surfaced via `code_action`, not bound to keymaps — users invoke them via `editor: toggle code actions` (`⌘.`/`Ctrl+.`).
 
 Code action title: the toggle action always uses the stateless label `Toggle highlight: "<word>"` rather than a state-dependent `Highlight` / `Remove highlight`. Zed caches code action responses by cursor position and only invalidates that cache on cursor movement or document edits — it does not implement `workspace/codeAction/refresh`. A stateless title is always accurate regardless of when Zed last fetched the response, avoiding the confusing mismatch of seeing `Highlight: "foo"` when the word is already highlighted (or vice versa) without the user having moved the cursor. Don't revert this to a state-dependent title without first verifying that Zed has added `workspace/codeAction/refresh` support.
 

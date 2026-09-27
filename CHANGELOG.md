@@ -16,12 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rearrange workspace configuration to avoid duplicate entries.
 - Use the `--locked` flag for all suitable `cargo` commands.
 - Improve code style.
+- Refactor the matching flags into a `MatchOptions` struct and derive `Default` for `State`.
+- Define the command names once as the `TOGGLE_COMMAND` and `CLEAR_COMMAND` constants.
 - Update documentation.
 - Update dependencies.
 
 ### Fixed
 
 - Use `as_chunks` in integration tests to avoid `clippy::chunks_exact_to_as_chunks`.
+- Release the state lock in `code_action` before scanning the document.
 
 ## [0.1.4] - 2026-08-08
 

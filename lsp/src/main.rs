@@ -32,6 +32,10 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const NUM_COLORS: usize = 8;
 /// Delay in milliseconds for the debounced refresh after edits.
 const DEBOUNCE_DELAY_MS: u64 = 250;
+/// Command that toggles the highlight of the word passed as its only argument.
+const TOGGLE_COMMAND: &str = "zed-highlight.toggle";
+/// Command that clears all highlights.
+const CLEAR_COMMAND: &str = "zed-highlight.clear";
 
 /// Absolute position of a single match as a (`line`, `start`, `length`, `token_type`) 4-tuple, before delta encoding.
 type RawToken = (u32, u32, u32, u32);
@@ -67,11 +71,34 @@ static TOKEN_TYPE_NAMES: [&str; NUM_COLORS] = [
     "zed-highlight-7",
 ];
 
+/// Matching rules applied to every highlighted word.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct MatchOptions {
+    /// Whether to only match whole words (e.g., "for" doesn't match inside "format").
+    whole_word: bool,
+    /// Whether to ignore case when matching (e.g., "Foo" matches "foo").
+    ignore_case: bool,
+}
+
+impl Default for MatchOptions {
+    /// Returns the default matching rules: [`MatchOptions::whole_word`] is enabled and [`MatchOptions::ignore_case`] is
+    /// disabled. This should be a sensible default behavior, and we can consider making these rules configurable later.
+    fn default() -> Self {
+        Self {
+            whole_word: true,
+            ignore_case: false,
+        }
+    }
+}
+
 /// LSP server's internal state.
 ///
 /// We track the list of highlighted words and the full text of every open document so we can scan for token positions
-/// on demand. We also track the user's settings for whole-word and case-insensitive matching. All state is kept in
-/// memory and shared across all documents and tabs, so highlighting a word in one file highlights it in all files.
+/// on demand. We also track the user's matching rules. All state is kept in memory and shared across all documents and
+/// tabs, so highlighting a word in one file highlights it in all files.
+///
+/// The derived [`Default`] starts with no words, no documents, and the default [`MatchOptions`].
+#[derive(Default)]
 struct State {
     /// The list of currently highlighted words. A removed slot becomes `None` and subsequent entries are not shifted.
     words: Vec<Option<String>>,
@@ -81,27 +108,11 @@ struct State {
     /// duplicating the entire document on every request.
     docs: HashMap<Url, Arc<str>>,
 
-    /// Whether to only match whole words (e.g., "for" doesn't match inside "format").
-    whole_word: bool,
-
-    /// Whether to ignore case when matching (e.g., "Foo" matches "foo").
-    ignore_case: bool,
+    /// Matching rules for whole-word and case-insensitive matching.
+    options: MatchOptions,
 }
 
 impl State {
-    /// Constructs a new instance of the server's internal state.
-    ///
-    /// By default, [`State::whole_word`] matching is set to true, while the [`State::ignore_case`] flag defaults to
-    /// false. This should be a sensible default behavior, and we can consider making these flags configurable later.
-    fn new() -> Self {
-        Self {
-            words: Vec::new(),
-            docs: HashMap::new(),
-            whole_word: true,
-            ignore_case: false,
-        }
-    }
-
     /// Toggles a word in/out of the highlight list.
     ///
     /// Three cases:
@@ -134,9 +145,9 @@ impl State {
         self.words.clear();
     }
 
-    /// Helper function to compare two words for equality, respecting the [`State::ignore_case`] flag.
+    /// Helper function to compare two words for equality, respecting [`MatchOptions::ignore_case`].
     fn words_eq(&self, left: &str, right: &str) -> bool {
-        if self.ignore_case {
+        if self.options.ignore_case {
             left.to_lowercase() == right.to_lowercase()
         } else {
             left == right
@@ -166,7 +177,7 @@ impl Backend {
     fn new(client: Client) -> Self {
         Self {
             client,
-            state: Arc::new(Mutex::new(State::new())),
+            state: Arc::new(Mutex::new(State::default())),
             refresh_handle: Mutex::new(None),
         }
     }
@@ -232,18 +243,13 @@ impl Backend {
     )]
     async fn build_tokens(&self, uri: &Url) -> Vec<SemanticToken> {
         // Snapshot the state and release the lock.
-        let (content, words, whole_word, ignore_case) = {
+        let (content, words, options) = {
             let state = self.state.lock().await;
             let Some(content) = state.docs.get(uri).cloned() else {
                 // Document not yet registered: return empty; the debounced refresh will fix it.
                 return Vec::new();
             };
-            (
-                content,
-                state.words.clone(),
-                state.whole_word,
-                state.ignore_case,
-            )
+            (content, state.words.clone(), state.options)
         };
 
         // Collect all matches as absolute positions.
@@ -257,7 +263,7 @@ impl Backend {
             };
 
             // Compile the regex for this word.
-            let Some(re) = compile_word_regex(word, whole_word, ignore_case) else {
+            let Some(re) = compile_word_regex(word, options) else {
                 // If the regex fails to compile, skip this word.
                 continue;
             };
@@ -366,10 +372,7 @@ impl LanguageServer for Backend {
 
                 // Register each supported command name so Zed knows to route `executeCommand` calls to this server.
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec![
-                        "zed-highlight.toggle".to_owned(),
-                        "zed-highlight.clear".to_owned(),
-                    ],
+                    commands: vec![TOGGLE_COMMAND.to_owned(), CLEAR_COMMAND.to_owned()],
                     work_done_progress_options: WorkDoneProgressOptions::default(),
                 }),
 
@@ -476,20 +479,19 @@ impl LanguageServer for Backend {
     /// when Zed last fetched the response, and avoids the confusing mismatch of seeing "Highlight: foo" when the word
     /// is already highlighted (or vice versa) without the user having moved their cursor.
     async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
-        // Snapshot the state.
-        let state = self.state.lock().await;
-        let Some(content) = state.docs.get(&params.text_document.uri).cloned() else {
-            return Ok(None);
+        // Snapshot the state and release the lock before scanning the document.
+        let (content, has_any, options) = {
+            let state = self.state.lock().await;
+            let Some(content) = state.docs.get(&params.text_document.uri).cloned() else {
+                return Ok(None);
+            };
+            (content, state.has_any(), state.options)
         };
-        let has_any = state.has_any();
 
         // Find the highlightable word the user is acting on, if any.
         let word = word_at(&content, params.range)
-            .filter(|word| is_highlightable(word, state.whole_word))
-            .filter(|word| matches_anywhere(&content, word, state.whole_word, state.ignore_case));
-
-        // Explicitly release the lock before building the response.
-        drop(state);
+            .filter(|word| is_highlightable(word, options))
+            .filter(|word| matches_anywhere(&content, word, options));
 
         // Build the list of code actions to return.
         let mut actions = Vec::<CodeActionOrCommand>::new();
@@ -503,7 +505,7 @@ impl LanguageServer for Backend {
                 // when the user selects this item. We encode the word as the single argument.
                 command: Some(Command {
                     title: "Toggle Highlight".to_owned(),
-                    command: "zed-highlight.toggle".to_owned(),
+                    command: TOGGLE_COMMAND.to_owned(),
                     arguments: Some(vec![serde_json::Value::String(word.clone())]),
                 }),
                 ..Default::default()
@@ -517,7 +519,7 @@ impl LanguageServer for Backend {
                 kind: Some(CodeActionKind::EMPTY),
                 command: Some(Command {
                     title: "Clear All Highlights".to_owned(),
-                    command: "zed-highlight.clear".to_owned(),
+                    command: CLEAR_COMMAND.to_owned(),
                     arguments: None,
                 }),
                 ..Default::default()
@@ -536,7 +538,7 @@ impl LanguageServer for Backend {
     ) -> Result<Option<serde_json::Value>> {
         match params.command.as_str() {
             // Toggle the highlight of the word embedded in the command arguments.
-            "zed-highlight.toggle" => {
+            TOGGLE_COMMAND => {
                 // The word was embedded as the first argument by [`Backend::code_action`].
                 let word = params
                     .arguments
@@ -547,7 +549,7 @@ impl LanguageServer for Backend {
                     // Toggle the word in the highlight list only if it's highlightable.
                     let toggled = {
                         let mut state = self.state.lock().await;
-                        if is_highlightable(&word, state.whole_word) {
+                        if is_highlightable(&word, state.options) {
                             state.toggle(&word);
                             true
                         } else {
@@ -561,7 +563,7 @@ impl LanguageServer for Backend {
             }
 
             // Clear all highlights by clearing the list of highlighted words.
-            "zed-highlight.clear" => {
+            CLEAR_COMMAND => {
                 self.state.lock().await.words_clear();
                 self.immediate_refresh().await;
             }
@@ -669,14 +671,14 @@ fn is_word_char(ch: char) -> bool {
 
 /// Helper function to check whether a given text can produce visible highlights based on the current matching rules.
 ///
-/// In `whole_word` mode the pattern `\b<escaped>\b` only matches when the first and last characters of the candidate
-/// are word characters. Candidates failing this rule would compile into a regex that never matches, so we use this
-/// predicate to filter them out early at the code action layer rather than letting them sit in `words` invisibly.
-fn is_highlightable(text: &str, whole_word: bool) -> bool {
+/// With [`MatchOptions::whole_word`] the pattern `\b<escaped>\b` only matches when the first and last characters of the
+/// candidate are word characters. Candidates failing this rule would compile into a regex that never matches, so we use
+/// this predicate to filter them out early at the code action layer rather than letting them sit in `words` invisibly.
+fn is_highlightable(text: &str, options: MatchOptions) -> bool {
     if text.is_empty() {
         return false;
     }
-    if !whole_word {
+    if !options.whole_word {
         return true;
     }
 
@@ -692,28 +694,28 @@ fn is_highlightable(text: &str, whole_word: bool) -> bool {
 /// This is the strongest predicate we can use to decide if a code action menu entry is worth showing: it asks the
 /// exact question whose answer determines whether the user would see anything change after toggling, at a somewhat
 /// negligible performance cost.
-fn matches_anywhere(content: &str, text: &str, whole_word: bool, ignore_case: bool) -> bool {
-    let Some(re) = compile_word_regex(text, whole_word, ignore_case) else {
+fn matches_anywhere(content: &str, text: &str, options: MatchOptions) -> bool {
+    let Some(re) = compile_word_regex(text, options) else {
         return false;
     };
     content.lines().any(|line| re.is_match(line))
 }
 
 /// Helper function to compile a regex for a given word, escaping it first so that punctuation is treated literally, and
-/// respecting the [`State::whole_word`] and [`State::ignore_case`] flags.
+/// respecting the given [`MatchOptions`].
 ///
 /// Returns `None` if the pattern fails to compile (unlikely for an escaped literal).
-fn compile_word_regex(word: &str, whole_word: bool, ignore_case: bool) -> Option<Regex> {
+fn compile_word_regex(word: &str, options: MatchOptions) -> Option<Regex> {
     // Treat the word as a literal string by escaping it.
     let escaped = regex::escape(word);
-    let pattern = if whole_word {
+    let pattern = if options.whole_word {
         // The word-boundary assertion prevents "for" from matching inside "format".
         format!(r"\b{escaped}\b")
     } else {
         escaped
     };
     RegexBuilder::new(&pattern)
-        .case_insensitive(ignore_case)
+        .case_insensitive(options.ignore_case)
         .build()
         .ok()
 }
@@ -741,6 +743,30 @@ async fn main() {
 mod tests {
     use super::*;
 
+    /// Substring, case-sensitive matching.
+    const SUBSTRING: MatchOptions = MatchOptions {
+        whole_word: false,
+        ignore_case: false,
+    };
+
+    /// Substring, case-insensitive matching.
+    const SUBSTRING_IGNORE_CASE: MatchOptions = MatchOptions {
+        whole_word: false,
+        ignore_case: true,
+    };
+
+    /// Whole-word, case-sensitive matching (the default).
+    const WHOLE_WORD: MatchOptions = MatchOptions {
+        whole_word: true,
+        ignore_case: false,
+    };
+
+    /// Whole-word, case-insensitive matching.
+    const WHOLE_WORD_IGNORE_CASE: MatchOptions = MatchOptions {
+        whole_word: true,
+        ignore_case: true,
+    };
+
     // Helper functions.
 
     fn make_range(start_line: u32, start_char: u32, end_line: u32, end_char: u32) -> Range {
@@ -760,44 +786,41 @@ mod tests {
         make_range(line, character, line, character)
     }
 
-    // Test `State::new`.
+    // Test `State::default`.
 
     #[test]
-    fn state_new_has_empty_word_list() {
-        let state = State::new();
+    fn state_default_has_empty_word_list() {
+        let state = State::default();
         assert!(state.words.is_empty());
     }
 
     #[test]
-    fn state_new_has_empty_docs() {
-        let state = State::new();
+    fn state_default_has_empty_docs() {
+        let state = State::default();
         assert!(state.docs.is_empty());
     }
 
     #[test]
-    fn state_new_defaults_whole_word_true() {
-        let state = State::new();
-        assert!(state.whole_word);
-    }
-
-    #[test]
-    fn state_new_defaults_ignore_case_false() {
-        let state = State::new();
-        assert!(!state.ignore_case);
+    fn state_default_uses_whole_word_case_sensitive_matching() {
+        assert_eq!(
+            State::default().options,
+            WHOLE_WORD,
+            "default matching rules must be whole-word and case-sensitive"
+        );
     }
 
     // Test `State::toggle`.
 
     #[test]
     fn state_toggle_adds_new_word() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.toggle("foo");
         assert_eq!(state.words, vec![Some("foo".to_owned())]);
     }
 
     #[test]
     fn state_toggle_removes_existing_word_leaving_none_slot() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.toggle("foo");
         state.toggle("foo");
         assert_eq!(state.words, vec![None]);
@@ -805,7 +828,7 @@ mod tests {
 
     #[test]
     fn state_toggle_reuses_first_none_slot_for_new_word() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.toggle("foo"); // slot 0 = Some("foo")
         state.toggle("foo"); // slot 0 = None
         state.toggle("bar"); // should reuse slot 0, not grow
@@ -814,7 +837,7 @@ mod tests {
 
     #[test]
     fn state_toggle_grows_list_when_no_free_slots() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.toggle("a");
         state.toggle("b");
         assert_eq!(state.words.len(), 2);
@@ -823,7 +846,7 @@ mod tests {
 
     #[test]
     fn state_toggle_leaves_other_words_in_place_after_removal() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.toggle("a");
         state.toggle("b");
         state.toggle("a"); // soft-delete "a"
@@ -833,8 +856,8 @@ mod tests {
 
     #[test]
     fn state_toggle_respects_ignore_case_for_deduplication() {
-        let mut state = State::new();
-        state.ignore_case = true;
+        let mut state = State::default();
+        state.options.ignore_case = true;
         state.toggle("Foo");
         state.toggle("foo"); // should match "Foo" and remove it
         assert!(
@@ -847,12 +870,12 @@ mod tests {
 
     #[test]
     fn state_has_any_false_when_empty() {
-        assert!(!State::new().has_any());
+        assert!(!State::default().has_any());
     }
 
     #[test]
     fn state_has_any_false_when_all_slots_are_none() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.toggle("a");
         state.toggle("a");
         assert!(!state.has_any());
@@ -860,14 +883,14 @@ mod tests {
 
     #[test]
     fn state_has_any_true_when_at_least_one_word_present() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.toggle("a");
         assert!(state.has_any());
     }
 
     #[test]
     fn state_has_any_true_with_mixed_none_and_some() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.toggle("a");
         state.toggle("b");
         state.toggle("a"); // remove "a", keep "b"
@@ -878,7 +901,7 @@ mod tests {
 
     #[test]
     fn state_words_clear_empties_list() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.toggle("a");
         state.toggle("b");
         state.words_clear();
@@ -887,7 +910,7 @@ mod tests {
 
     #[test]
     fn state_words_clear_results_in_has_any_false() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.toggle("a");
         state.words_clear();
         assert!(!state.has_any());
@@ -897,29 +920,29 @@ mod tests {
 
     #[test]
     fn state_words_eq_identical_strings() {
-        let state = State::new();
+        let state = State::default();
         assert!(state.words_eq("hello", "hello"));
     }
 
     #[test]
     fn state_words_eq_case_sensitive_by_default() {
-        let state = State::new();
+        let state = State::default();
         assert!(!state.words_eq("Foo", "foo"));
     }
 
     #[test]
     fn state_words_eq_case_insensitive_when_flag_set() {
-        let mut state = State::new();
-        state.ignore_case = true;
+        let mut state = State::default();
+        state.options.ignore_case = true;
         assert!(state.words_eq("Foo", "foo"));
         assert!(state.words_eq("FOO", "foo"));
     }
 
     #[test]
     fn state_words_eq_different_words_always_false() {
-        let mut state = State::new();
+        let mut state = State::default();
         assert!(!state.words_eq("foo", "bar"));
-        state.ignore_case = true;
+        state.options.ignore_case = true;
         assert!(!state.words_eq("foo", "bar"));
     }
 
@@ -1051,80 +1074,80 @@ mod tests {
 
     #[test]
     fn is_highlightable_empty_string_always_false() {
-        assert!(!is_highlightable("", false));
-        assert!(!is_highlightable("", true));
+        assert!(!is_highlightable("", SUBSTRING));
+        assert!(!is_highlightable("", WHOLE_WORD));
     }
 
     #[test]
     fn is_highlightable_nonword_chars_in_whole_word_mode_false() {
-        assert!(!is_highlightable(".", true));
-        assert!(!is_highlightable("()", true));
+        assert!(!is_highlightable(".", WHOLE_WORD));
+        assert!(!is_highlightable("()", WHOLE_WORD));
     }
 
     #[test]
     fn is_highlightable_any_nonempty_without_whole_word_mode_true() {
-        assert!(is_highlightable("foo", false));
-        assert!(is_highlightable("(bar)", false));
-        assert!(is_highlightable("foo bar", false));
+        assert!(is_highlightable("foo", SUBSTRING));
+        assert!(is_highlightable("(bar)", SUBSTRING));
+        assert!(is_highlightable("foo bar", SUBSTRING));
     }
 
     #[test]
     fn is_highlightable_identifier_in_whole_word_mode_true() {
-        assert!(is_highlightable("foo", true));
-        assert!(is_highlightable("foo_bar", true));
-        assert!(is_highlightable("foo123", true));
-        assert!(is_highlightable("_private", true));
+        assert!(is_highlightable("foo", WHOLE_WORD));
+        assert!(is_highlightable("foo_bar", WHOLE_WORD));
+        assert!(is_highlightable("foo123", WHOLE_WORD));
+        assert!(is_highlightable("_private", WHOLE_WORD));
     }
 
     #[test]
     fn is_highlightable_leading_nonword_char_in_whole_word_mode_false() {
-        assert!(!is_highlightable("(foo", true));
-        assert!(!is_highlightable(".foo", true));
-        assert!(!is_highlightable(" foo", true));
+        assert!(!is_highlightable("(foo", WHOLE_WORD));
+        assert!(!is_highlightable(".foo", WHOLE_WORD));
+        assert!(!is_highlightable(" foo", WHOLE_WORD));
     }
 
     #[test]
     fn is_highlightable_trailing_nonword_char_in_whole_word_mode_false() {
-        assert!(!is_highlightable("foo(", true));
-        assert!(!is_highlightable("foo.", true));
-        assert!(!is_highlightable("foo ", true));
+        assert!(!is_highlightable("foo(", WHOLE_WORD));
+        assert!(!is_highlightable("foo.", WHOLE_WORD));
+        assert!(!is_highlightable("foo ", WHOLE_WORD));
     }
 
     #[test]
     fn is_highlightable_middle_nonword_char_always_true() {
-        assert!(is_highlightable("foo.bar", true));
-        assert!(is_highlightable("foo.bar", false));
+        assert!(is_highlightable("foo.bar", WHOLE_WORD));
+        assert!(is_highlightable("foo.bar", SUBSTRING));
     }
 
     #[test]
     fn is_highlightable_single_word_char_true() {
-        assert!(is_highlightable("x", true));
-        assert!(is_highlightable("_", true));
-        assert!(is_highlightable("1", true));
+        assert!(is_highlightable("x", WHOLE_WORD));
+        assert!(is_highlightable("_", WHOLE_WORD));
+        assert!(is_highlightable("1", WHOLE_WORD));
     }
 
     // TODO: The behavior of `is_highlightable` without whole-word mode with non-word characters is somewhat debatable.
     // We should probably refine it if `whole_word` ever becomes user-configurable. Leave as-is for the time being.
     #[test]
     fn is_highlightable_any_nonempty_selection_without_whole_word_mode_true() {
-        assert!(is_highlightable(" ", false));
-        assert!(is_highlightable(".", false));
-        assert!(is_highlightable("()", false));
-        assert!(is_highlightable("foo bar", false));
+        assert!(is_highlightable(" ", SUBSTRING));
+        assert!(is_highlightable(".", SUBSTRING));
+        assert!(is_highlightable("()", SUBSTRING));
+        assert!(is_highlightable("foo bar", SUBSTRING));
     }
 
     // Test `compile_word_regex`.
 
     #[test]
     fn compile_word_regex_whole_word_and_ignore_case_both_disabled() {
-        let mut re = compile_word_regex("for", false, false).unwrap();
+        let mut re = compile_word_regex("for", SUBSTRING).unwrap();
         assert!(re.is_match("for"), "basic match must work");
         assert!(
             re.is_match("format"),
             "non-whole-word must match when whole-word disabled"
         );
 
-        re = compile_word_regex("For", false, false).unwrap();
+        re = compile_word_regex("For", SUBSTRING).unwrap();
         assert!(
             re.is_match("For"),
             "case-sensitive match must work when ignore_case disabled"
@@ -1141,7 +1164,7 @@ mod tests {
 
     #[test]
     fn compile_word_regex_case_insensitive_flag_enabled() {
-        let re = compile_word_regex("Foo", false, true).unwrap();
+        let re = compile_word_regex("Foo", SUBSTRING_IGNORE_CASE).unwrap();
         assert!(
             re.is_match("Foo"),
             "case-insensitive match must work when ignore_case enabled"
@@ -1158,7 +1181,7 @@ mod tests {
 
     #[test]
     fn compile_word_regex_whole_word_flag_enabled() {
-        let re = compile_word_regex("for", true, false).unwrap();
+        let re = compile_word_regex("for", WHOLE_WORD).unwrap();
         assert!(
             re.is_match("for x in y"),
             "whole-word 'for' must match standalone"
@@ -1179,7 +1202,7 @@ mod tests {
 
     #[test]
     fn compile_word_regex_whole_word_and_ignore_case_both_enabled() {
-        let re = compile_word_regex("Foo", true, true).unwrap();
+        let re = compile_word_regex("Foo", WHOLE_WORD_IGNORE_CASE).unwrap();
         assert!(
             re.is_match("foo"),
             "case-insensitive whole-word must match lowercase"
@@ -1200,22 +1223,22 @@ mod tests {
 
     #[test]
     fn compile_word_regex_escapes_special_chars() {
-        let mut re = compile_word_regex("foo.bar", false, false).unwrap();
+        let mut re = compile_word_regex("foo.bar", SUBSTRING).unwrap();
         assert!(re.is_match("foo.bar"));
         assert!(
             !re.is_match("fooXbar"),
             "dot must match literally, not as any-char"
         );
 
-        re = compile_word_regex("foo()", false, false).unwrap();
+        re = compile_word_regex("foo()", SUBSTRING).unwrap();
         assert!(re.is_match("foo()"));
         assert!(!re.is_match("foo"), "parentheses are not optional");
 
-        re = compile_word_regex("a*b", false, false).unwrap();
+        re = compile_word_regex("a*b", SUBSTRING).unwrap();
         assert!(re.is_match("a*b"));
         assert!(!re.is_match("ab"), "star must be literal, not a quantifier");
 
-        re = compile_word_regex("a+b", false, false).unwrap();
+        re = compile_word_regex("a+b", SUBSTRING).unwrap();
         assert!(re.is_match("a+b"));
         assert!(!re.is_match("ab"), "plus must be literal, not a quantifier");
         assert!(
@@ -1223,7 +1246,7 @@ mod tests {
             "plus must be literal, not a quantifier"
         );
 
-        re = compile_word_regex("a?b", false, false).unwrap();
+        re = compile_word_regex("a?b", SUBSTRING).unwrap();
         assert!(re.is_match("a?b"));
         assert!(
             !re.is_match("ab"),
@@ -1234,7 +1257,7 @@ mod tests {
             "question mark must be literal, not optional"
         );
 
-        re = compile_word_regex("a|b", false, false).unwrap();
+        re = compile_word_regex("a|b", SUBSTRING).unwrap();
         assert!(re.is_match("a|b"));
         assert!(!re.is_match("a"), "pipe must be literal, not alternation");
         assert!(!re.is_match("b"), "pipe must be literal, not alternation");
@@ -1244,58 +1267,57 @@ mod tests {
 
     #[test]
     fn matches_anywhere_finds_word_in_content() {
-        assert!(matches_anywhere("let foo = 1;", "foo", true, false));
+        assert!(matches_anywhere("let foo = 1;", "foo", WHOLE_WORD));
     }
 
     #[test]
     fn matches_anywhere_returns_false_for_absent_word() {
-        assert!(!matches_anywhere("let foo = 1;", "bar", true, false));
+        assert!(!matches_anywhere("let foo = 1;", "bar", WHOLE_WORD));
     }
 
     #[test]
     fn matches_anywhere_whole_word_rejects_substring() {
-        assert!(!matches_anywhere("format!()", "for", true, false));
+        assert!(!matches_anywhere("format!()", "for", WHOLE_WORD));
     }
 
     #[test]
     fn matches_anywhere_non_whole_word_finds_substring() {
-        assert!(matches_anywhere("format!()", "for", false, false));
+        assert!(matches_anywhere("format!()", "for", SUBSTRING));
     }
 
     #[test]
     fn matches_anywhere_case_insensitive_finds_match() {
-        assert!(matches_anywhere("let Foo = 1;", "foo", false, true));
+        assert!(matches_anywhere(
+            "let Foo = 1;",
+            "foo",
+            SUBSTRING_IGNORE_CASE
+        ));
     }
 
     #[test]
     fn matches_anywhere_multiline_content_any_line() {
         let content = "line one\nfoo here\nline three";
-        assert!(matches_anywhere(content, "foo", true, false));
+        assert!(matches_anywhere(content, "foo", WHOLE_WORD));
     }
 
     #[test]
     fn matches_anywhere_empty_content_returns_false() {
-        assert!(!matches_anywhere("", "foo", true, false));
+        assert!(!matches_anywhere("", "foo", WHOLE_WORD));
     }
 
     #[test]
     fn matches_anywhere_word_not_on_this_line_returns_false() {
-        assert!(!matches_anywhere(
-            "line one\nline two",
-            "three",
-            true,
-            false
-        ));
+        assert!(!matches_anywhere("line one\nline two", "three", WHOLE_WORD));
     }
 
     #[test]
     fn matches_anywhere_whole_word_and_ignore_case_both_enabled() {
         assert!(
-            matches_anywhere("let Foo = 1;", "foo", true, true),
+            matches_anywhere("let Foo = 1;", "foo", WHOLE_WORD_IGNORE_CASE),
             "'Foo' should match 'foo' with whole_word and ignore_case both enabled"
         );
         assert!(
-            !matches_anywhere("Format()", "for", true, true),
+            !matches_anywhere("Format()", "for", WHOLE_WORD_IGNORE_CASE),
             "'for' should not match inside 'Format' even with ignore_case enabled when whole_word is enabled"
         );
     }
@@ -1958,7 +1980,7 @@ mod integration {
     async fn toggle_non_highlightable_word_is_no_op() {
         let mut svc = make_service().await;
         open(&mut svc, URI, "foo . bar").await;
-        // "." starts and ends with a non-word character — `is_highlightable(".", true)` is false.
+        // "." starts and ends with a non-word character — `is_highlightable` rejects it under whole-word matching.
         toggle(&mut svc, 1, ".").await;
         let data = get_tokens(&mut svc, 2, URI).await;
         assert!(
