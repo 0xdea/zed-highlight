@@ -184,7 +184,9 @@ impl Backend {
             handle.abort();
         }
 
-        // Send the refresh request to Zed, ignoring any errors.
+        // Send the refresh request to Zed. Errors are deliberately ignored: the refresh is best-effort (e.g., it fails if
+        // the client has disconnected) and there is no fallback to try. If it fails, a toggle or clear only becomes
+        // visible once Zed re-requests tokens on its own (e.g., after the next edit).
         _ = self.client.semantic_tokens_refresh().await;
     }
 
@@ -203,6 +205,8 @@ impl Backend {
         let client = self.client.clone();
         *guard = Some(tokio::spawn(async move {
             time::sleep(Duration::from_millis(DEBOUNCE_DELAY_MS)).await;
+            // Errors are deliberately ignored: this refresh always follows an edit, after which Zed re-requests tokens on
+            // its own anyway.
             _ = client.semantic_tokens_refresh().await;
         }));
     }
@@ -613,7 +617,7 @@ fn utf16_to_byte(text: &str, utf16_offset: usize) -> Option<usize> {
 )]
 #[expect(
     clippy::arithmetic_side_effects,
-    reason = "`end` cannot reasonably overflow here"
+    reason = "`end` is at most `line.len()`, so the additions cannot overflow"
 )]
 fn word_at(content: &str, range: Range) -> Option<String> {
     // Get the line where the cursor is. If the line is missing (shouldn't happen with valid LSP data), return None.
@@ -1462,7 +1466,7 @@ mod integration {
 
     /// Creates a fresh service and completes the mandatory LSP handshake (`initialize` -> `initialized`).
     /// The `ClientSocket` (used for server-to-client notifications) is dropped immediately; the backend
-    /// ignores send errors with `let _ =`, so this is safe and avoids keeping a handle we don't need.
+    /// ignores send errors with `_ =`, so this is safe and avoids keeping a handle we don't need.
     async fn make_service() -> Svc {
         let (mut svc, socket) = LspService::new(Backend::new);
         drop(

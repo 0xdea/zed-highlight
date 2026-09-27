@@ -14,13 +14,17 @@ The extension WASM and the LSP binary are independent build artifacts. End users
 ## Commands
 
 ```sh
-# Format / lint / build (workspace-wide)
+# Format / lint / build (workspace-wide). The root is a non-virtual workspace, so `--workspace` is required: without
+# it, clippy/build/test only cover the root extension crate and skip `lsp`.
 cargo fmt --all --check
-cargo clippy --all-targets --locked -- -D warnings
-cargo build --locked
-cargo test --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo build --workspace --locked
+cargo test --workspace --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 cargo audit
+
+# Build the extension for the WASM target, as CI does
+cargo build --locked --target wasm32-wasip2 -p zed-highlight
 
 # Install the LSP locally for dev (so the extension uses it instead of downloading)
 cargo install --path lsp --locked
@@ -43,7 +47,8 @@ The workspace `[lints]` table in `Cargo.toml` enables clippy `all`, `pedantic`, 
 - Every item, including private ones, needs a doc comment.
 - Don't add `unwrap()`, `expect()`, `panic!`, `todo!`, `unreachable!`, or `dbg!` — clippy will fail CI.
 - When suppressing a lint, prefer `#[expect(..., reason = "...")]` over `#[allow(...)]` and always include a reason (`allow_attributes_without_reason` is on).
-- Errors that must be ignored should be matched explicitly (e.g. `let _ = ...`) only with an `#[expect(clippy::let_underscore_must_use, reason = "...")]` block.
+- Errors that must be ignored (best-effort work) are discarded with `_ = ...;` and a comment right above explaining why ignoring them is safe. This deliberately deviates from the `rust-style` skill's rule of matching the ignored variants explicitly.
+- Avoid bare arithmetic under `#[expect(clippy::arithmetic_side_effects)]`: prefer code that needs no arithmetic at all, then `saturating_*` for counters, and `checked_*` (with `?` or `let ... else`) when overflow is an error. Keep a bare operation under `#[expect]` only when it provably cannot overflow and the arithmetic-free alternatives cost clarity or performance (e.g., `word_at`); the `reason` must state why it cannot overflow.
 - `pattern_type_mismatch` is allowed, so Rust's default binding modes (implicit match ergonomics) are fine.
 - `shadow_reuse` is allowed: shadow a variable for a clear transformation of the same value (e.g., `let word = ...; if let Some(word) = word { ... }`). `shadow_unrelated` stays on, so never reuse a name for an unrelated value.
 - `min_ident_chars` is on — no single-character identifiers (`ch`, `idx`, `err`, `word`, not `c`, `i`, `e`, `w`). Clippy's default exemptions (`i`, `j`, `n`, `w`, `x`, `y`, `z`) are not used either; single-char lifetimes (`'a`) are fine.

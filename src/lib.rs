@@ -172,9 +172,14 @@ impl WordHighlightExtension {
 
         // Remove any other directories to avoid unbounded disk growth. Runs unconditionally so that we self-heal when a
         // previous install succeeded but the prune step failed or was interrupted on an earlier run.
+        //
+        // Errors from `read_dir`, from individual entries, and from `remove_dir_all` are all deliberately ignored:
+        // pruning is best-effort cleanup that must not block the language server from starting. Any leftover directory
+        // is retried the next time `install_binary` runs to completion.
         if let Ok(entries) = fs::read_dir(".") {
             for entry in entries.flatten() {
                 if entry.file_name().to_str() != Some(&version_dir) {
+                    // Best-effort removal: ignoring the error is safe, see above.
                     _ = fs::remove_dir_all(entry.path());
                 }
             }
