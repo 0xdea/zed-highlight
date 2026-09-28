@@ -611,8 +611,8 @@ fn utf16_to_byte(text: &str, utf16_offset: usize) -> Option<usize> {
 /// 1. Non-empty single-line selection: use the selected text directly.
 /// 2. Cursor (empty range, or multi-line): find the word under the cursor by scanning backwards and forwards.
 ///
-/// "Word characters" are alphanumerics plus underscore, matching `\w` in most regex flavors and covering the common
-/// case of identifiers in source code.
+/// "Word characters" are the regex engine's `\w` (see [`is_word_char`]): letters, digits, combining marks, and
+/// connector punctuation such as underscore, which covers identifiers in source code.
 #[expect(
     clippy::as_conversions,
     reason = "the `as` conversion from `u32` to `usize` is safe"
@@ -665,8 +665,14 @@ fn word_at(content: &str, range: Range) -> Option<String> {
 }
 
 /// Helper function to check if a character is a "word character" for the purposes of determining word boundaries.
+///
+/// This is the regex engine's own definition (the one behind `\w` and `\b`), so that a word found by [`word_at`] can
+/// always be matched by the `\b<word>\b` pattern built by [`compile_word_regex`]. It includes combining marks (e.g.,
+/// U+0301 in a decomposed "café", or the Devanagari virama), which `char::is_alphanumeric` rejects, and it excludes
+/// non-letter numbers (e.g., '²'), which `char::is_alphanumeric` accepts.
 fn is_word_char(ch: char) -> bool {
-    ch.is_alphanumeric() || ch == '_'
+    // Cannot panic: `Cargo.toml` enables the `unicode-perl` feature that `is_word_character` requires.
+    regex_syntax::is_word_character(ch)
 }
 
 /// Helper function to check whether a given text can produce visible highlights based on the current matching rules.
@@ -1211,6 +1217,63 @@ mod tests {
         }
     }
 
+    #[test]
+    fn is_word_char_agrees_with_the_regex_engine() {
+        // `compile_word_regex` relies on `\b`, so `is_word_char` must agree with both `\w` and `\b`.
+        let word = Regex::new(r"^\w$").unwrap();
+        let boundary_before = Regex::new(r"^\b").unwrap();
+        for ch in [
+            'a', 'Z', '0', '9', '_', 'é', '中', 'न', '\u{301}', '\u{94D}', '‿', '\u{200D}', '²',
+            '½', '①', ' ', '\t', '.', '-', '(', '😀',
+        ] {
+            let text = ch.to_string();
+            assert_eq!(
+                is_word_char(ch),
+                word.is_match(&text),
+                "U+{:04X} must agree with `\\w`",
+                u32::from(ch)
+            );
+            assert_eq!(
+                is_word_char(ch),
+                boundary_before.is_match(&text),
+                "U+{:04X} must agree with `\\b`",
+                u32::from(ch)
+            );
+        }
+    }
+
+    #[test]
+    fn is_word_char_includes_marks_and_connectors() {
+        assert!(
+            is_word_char('\u{301}'),
+            "a combining mark must be a word char"
+        );
+        assert!(
+            is_word_char('\u{94D}'),
+            "the Devanagari virama must be a word char"
+        );
+        assert!(
+            is_word_char('‿'),
+            "connector punctuation must be a word char"
+        );
+        assert!(
+            is_word_char('\u{200D}'),
+            "a zero-width joiner must be a word char"
+        );
+    }
+
+    #[test]
+    fn is_word_char_excludes_non_letter_numbers() {
+        assert!(
+            !is_word_char('²'),
+            "a superscript digit must not be a word char"
+        );
+        assert!(
+            !is_word_char('½'),
+            "a vulgar fraction must not be a word char"
+        );
+    }
+
     // Test `is_highlightable`.
 
     #[test]
@@ -1352,6 +1415,15 @@ mod tests {
         assert!(
             is_highlightable("foo bar", SUBSTRING),
             "text containing a space must be highlightable in substring mode"
+        );
+    }
+
+    #[test]
+    fn is_highlightable_trailing_combining_mark_in_whole_word_mode_true() {
+        // Decomposed (NFD) "café": the word ends with U+0301, which the regex engine treats as a word char.
+        assert!(
+            is_highlightable("cafe\u{301}", WHOLE_WORD),
+            "a word ending in a combining mark must be highlightable in whole-word mode"
         );
     }
 
@@ -1736,12 +1808,61 @@ mod tests {
 
     #[test]
     fn word_at_unicode_alphanumeric_char() {
-        // "café": 'é' (U+00E9) is alphanumeric, so it's a word character. Cursor at UTF-16
+        // "café": 'é' (U+00E9) is a letter, so it's a word character. Cursor at UTF-16
         // offset 3 (on 'é') must return the full word "café".
         assert_eq!(
             word_at("café", cursor_range(0, 3)),
             Some("café".to_owned()),
             "non-ASCII letters must be part of the word under the cursor"
+        );
+    }
+
+    #[test]
+    fn word_at_decomposed_word_includes_combining_mark() {
+        // Decomposed (NFD) "café" is "cafe" + U+0301; the mark is at UTF-16 offset 4.
+        let line = "cafe\u{301} au lait";
+        for character in [0, 3, 4] {
+            assert_eq!(
+                word_at(line, cursor_range(0, character)),
+                Some("cafe\u{301}".to_owned()),
+                "the combining mark must be part of the word (cursor at {character})"
+            );
+        }
+    }
+
+    #[test]
+    fn word_at_word_with_virama_is_not_split() {
+        // "नमस्ते" contains the virama U+094D, a combining mark that `char::is_alphanumeric` rejects.
+        assert_eq!(
+            word_at("नमस्ते दुनिया", cursor_range(0, 0)),
+            Some("नमस्ते".to_owned()),
+            "a word containing a virama must not be split at the virama"
+        );
+    }
+
+    #[test]
+    fn word_at_stops_before_non_letter_number() {
+        // `\bx²\b` can't match "x² = 1" (no boundary after '²'), but `\bx\b` can.
+        assert_eq!(
+            word_at("x² = 1", cursor_range(0, 0)),
+            Some("x".to_owned()),
+            "the word must stop before '²' so that it can match in whole-word mode"
+        );
+        assert_eq!(
+            word_at("x² = 1", cursor_range(0, 1)),
+            None,
+            "a cursor on '²' must yield no word"
+        );
+    }
+
+    #[test]
+    fn word_at_splits_word_at_non_letter_number() {
+        // Known limitation (see `CLAUDE.md`): '²' is not a regex word char, so "a²a" is two words, "a" and "a".
+        // Selecting "a²a" explicitly still highlights it as a whole.
+        assert_eq!(
+            word_at("a²a", cursor_range(0, 0)),
+            Some("a".to_owned()),
+            "an inner '²' must split the word, as it does for the regex engine"
         );
     }
 }
@@ -2384,6 +2505,44 @@ mod integration {
                 .iter()
                 .any(|title| title == r#"Toggle highlight: "foo.bar""#),
             "selection must yield a toggle action for the full selected text; got: {actions:?}"
+        );
+    }
+
+    /// A decomposed (NFD) word like "cafe" + U+0301 must be offered as a whole and highlighted as a whole. Splitting it
+    /// at the combining mark would produce "cafe", whose `\bcafe\b` pattern never matches because U+0301 is a word
+    /// character for the regex engine, so no toggle action would be offered at all.
+    #[tokio::test]
+    async fn decomposed_word_is_offered_and_highlighted() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "cafe\u{301} au lait").await;
+        let actions = code_action(&mut svc, 1, URI, 0, 0).await;
+        assert!(
+            actions
+                .iter()
+                .any(|title| title == "Toggle highlight: \"cafe\u{301}\""),
+            "the decomposed word must be offered as a whole; got: {actions:?}"
+        );
+        toggle(&mut svc, 2, "cafe\u{301}").await;
+        let data = get_tokens(&mut svc, 3, URI).await;
+        assert_eq!(
+            data,
+            [0, 0, 5, 0, 0],
+            "the whole decomposed word (5 UTF-16 code units) must be highlighted"
+        );
+    }
+
+    /// A word followed by a non-letter number (e.g., "x²") must be offered without it: `\bx²\b` never matches
+    /// "x² = 1" because the regex engine sees no word boundary after '²', while `\bx\b` does.
+    #[tokio::test]
+    async fn word_before_superscript_is_offered_without_it() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "x² = 1").await;
+        let actions = code_action(&mut svc, 1, URI, 0, 0).await;
+        assert!(
+            actions
+                .iter()
+                .any(|title| title == r#"Toggle highlight: "x""#),
+            "the word before '²' must be offered; got: {actions:?}"
         );
     }
 }

@@ -194,6 +194,8 @@ Place the cursor on a word (or select a range of text) and open the code actions
 - `Toggle highlight` - Toggle highlighting on and off for the current selection or cursor position.
 - `Clear all highlights` - Remove all active highlights with a single command.
 
+Word boundaries follow the Unicode definition of word characters used by the [regex](https://crates.io/crates/regex) crate (letters, digits, combining marks, and connector punctuation such as `_`). As a result, non-letter numbers such as `²` or `½` split words: with the cursor on `a²a`, only `a` is offered. Select the text explicitly to highlight it as a whole.
+
 ## Compatibility
 
 The latest release was tested with Zed 1.14.2 (ARM64) on:
