@@ -231,7 +231,7 @@ impl Backend {
     /// Character offsets must be in UTF-16 code units because that is what the LSP spec mandates.
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "UTF-16 code unit count should fit in u32 for any reasonable line length"
+        reason = "line indices fit in `u32` for any realistic document, and LSP positions are `u32` anyway"
     )]
     #[expect(
         clippy::integer_division_remainder_used,
@@ -239,7 +239,11 @@ impl Backend {
     )]
     #[expect(
         clippy::as_conversions,
-        reason = "the `as` conversion is safe here because of the modulo operation"
+        reason = "the color index is below `NUM_COLORS` after the modulo, and line indices are covered above"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "tokens are sorted by (`line`, `start`), so neither delta subtraction can underflow"
     )]
     async fn build_tokens(&self, uri: &Url) -> Vec<SemanticToken> {
         // Snapshot the state and release the lock.
@@ -297,18 +301,11 @@ impl Backend {
         let mut prev_start = 0;
 
         for (line, start, length, token_type) in raw {
-            // Sorting guarantees that neither subtraction underflows. Should that ever break, skip the token rather
-            // than emit a corrupted delta; `prev_line` and `prev_start` are only updated for emitted tokens, so the
-            // rest of the stream stays correctly encoded.
-            let Some(delta_line) = line.checked_sub(prev_line) else {
-                continue;
-            };
-            let Some(delta_start) = (if delta_line == 0 {
-                start.checked_sub(prev_start)
+            let delta_line = line - prev_line;
+            let delta_start = if delta_line == 0 {
+                start - prev_start
             } else {
-                Some(start)
-            }) else {
-                continue;
+                start
             };
             tokens.push(SemanticToken {
                 delta_line,
@@ -578,16 +575,10 @@ impl LanguageServer for Backend {
 }
 
 /// Helper function to count the number of UTF-16 code units in a UTF-8 string slice.
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "UTF-16 code unit count should fit in u32 for any reasonable line length"
-)]
-#[expect(
-    clippy::as_conversions,
-    reason = "the `as` conversion is reasonably safe here because we are operating on strings"
-)]
+///
+/// The count saturates at `u32::MAX`, the largest offset an LSP position can hold.
 fn utf16_len(text: &str) -> u32 {
-    text.chars().map(|ch| ch.len_utf16() as u32).sum()
+    u32::try_from(text.encode_utf16().count()).unwrap_or(u32::MAX)
 }
 
 /// Helper function to convert a UTF-16 character offset to a byte offset within `text`.
@@ -598,10 +589,10 @@ fn utf16_to_byte(text: &str, utf16_offset: usize) -> Option<usize> {
         if count == utf16_offset {
             return Some(byte_idx);
         }
-        count = count.checked_add(ch.len_utf16())?;
+        // Cannot saturate in practice: the UTF-16 count never exceeds the byte length of `text`.
+        count = count.saturating_add(ch.len_utf16());
     }
-    // Returns `None` if the offset is past the end of the string (shouldn't happen with valid LSP data) or if the
-    // UTF-16 count overflows.
+    // Returns `None` if the offset is past the end of the string (shouldn't happen with valid LSP data).
     (count == utf16_offset).then_some(text.len())
 }
 
@@ -615,7 +606,7 @@ fn utf16_to_byte(text: &str, utf16_offset: usize) -> Option<usize> {
 /// connector punctuation such as underscore, which covers identifiers in source code.
 #[expect(
     clippy::as_conversions,
-    reason = "the `as` conversion from `u32` to `usize` is safe"
+    reason = "`u32` to `usize` is lossless: `usize` is at least 32 bits on every supported target"
 )]
 #[expect(
     clippy::arithmetic_side_effects,
