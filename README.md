@@ -30,7 +30,7 @@ The following features are currently supported by the extension and the bundled 
   - `Toggle highlight` - Toggle highlighting on and off for the current selection or cursor position.
   - `Clear all highlights` - Remove all active highlights with a single command.
 - Configurable highlight colors (via `settings.json`).
-- Support for all languages supported by Zed.
+- Support for most languages supported by Zed (open an issue if you need support for a specific language).
 - Cross-platform support for macOS, Linux, and Windows.
 - Automatic installation and updates of the LSP server via the extension.
 

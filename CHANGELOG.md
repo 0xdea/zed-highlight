@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `Assembly` language support.
+- Add support for more languages, including Zed's built-in `Git Commit`, `Go Mod`, and `Go Work`, and reverse engineering and security formats such as `Assembly`, `LOG`, `Strace`, `LLVM IR`, `Smali`, and `Solidity`.
 
 ### Changed
 
@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use `as_chunks` in integration tests to avoid `clippy::chunks_exact_to_as_chunks`.
 - Release the state lock in `code_action` before scanning the document.
 - Align word boundaries with the regex engine, so that words with combining marks and words next to non-letter numbers get a toggle action.
+- Rename the `Makefile` language to `Make` and remove `Bash`, which didn't match any Zed language.
 
 ## [0.1.4] - 2026-08-08
 
