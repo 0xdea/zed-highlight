@@ -1070,14 +1070,14 @@ dependencies = [
 
 [[package]]
 name = "zed-highlight"
-version = "0.1.5-alpha"
+version = "0.1.5"
 dependencies = [
  "zed_extension_api",
 ]
 
 [[package]]
 name = "zed-highlight-lsp"
-version = "0.1.5-alpha"
+version = "0.1.5"
 dependencies = [
  "regex",
  "regex-syntax",
