@@ -489,7 +489,7 @@ impl LanguageServer for Backend {
         };
 
         // Find the highlightable word the user is acting on, if any.
-        let word = word_at(&content, params.range)
+        let word = word_at(&content, params.range, options)
             .filter(|word| is_highlightable(word, options))
             .filter(|word| matches_anywhere(&content, word, options));
 
@@ -609,19 +609,19 @@ fn utf16_to_byte(text: &str, utf16_offset: usize) -> Option<usize> {
 ///
 /// Two cases:
 /// 1. Non-empty single-line selection: use the selected text directly.
-/// 2. Cursor (empty range, or multi-line): find the word under the cursor by scanning backwards and forwards.
-///
-/// "Word characters" are alphanumerics plus underscore, matching `\w` in most regex flavors and covering the common
-/// case of identifiers in source code.
+/// 2. Cursor (empty range, or multi-line): find the word under the cursor by scanning backwards and forwards over
+///    [`is_word_char`] characters. With [`MatchOptions::whole_word`], also trim characters that aren't
+///    [`is_regex_word_char`] from both ends, so that the `\b<word>\b` pattern built by [`compile_word_regex`] matches
+///    the word where it stands.
 #[expect(
     clippy::as_conversions,
     reason = "the `as` conversion from `u32` to `usize` is safe"
 )]
 #[expect(
     clippy::arithmetic_side_effects,
-    reason = "`end` is at most `line.len()`, so the additions cannot overflow"
+    reason = "all offsets are within `line`, and a trimmed run is never longer than the run it comes from"
 )]
-fn word_at(content: &str, range: Range) -> Option<String> {
+fn word_at(content: &str, range: Range, options: MatchOptions) -> Option<String> {
     // Get the line where the cursor is. If the line is missing (shouldn't happen with valid LSP data), return None.
     let line = content.lines().nth(range.start.line as usize)?;
 
@@ -645,35 +645,62 @@ fn word_at(content: &str, range: Range) -> Option<String> {
         return None;
     }
 
-    // Scan left from the cursor position to find the start of the word.
-    let start = line[..byte_pos]
+    // Scan left from the cursor position to find the start of the run of word characters.
+    let run_start = line[..byte_pos]
         .char_indices()
         .rev()
         .take_while(|&(_, ch)| is_word_char(ch))
         .last()
         .map_or(byte_pos, |(byte_idx, _)| byte_idx);
 
-    // Scan right from the cursor position to find the end of the word.
-    let end = byte_pos
+    // Scan right from the cursor position to find the end of the run of word characters.
+    let run_end = byte_pos
         + line[byte_pos..]
             .char_indices()
             .take_while(|&(_, ch)| is_word_char(ch))
             .last()
             .map_or(0, |(byte_idx, ch)| byte_idx + ch.len_utf8());
 
-    (start < end).then(|| line[start..end].to_owned())
+    // In whole-word mode, trim characters the regex engine doesn't treat as word characters (e.g., '²'), so that `\b`
+    // matches at both ends. Substring mode has no `\b`, so the whole run is kept.
+    let (start, end) = if options.whole_word {
+        let run = &line[run_start..run_end];
+        (
+            run_end - run.trim_start_matches(|ch| !is_regex_word_char(ch)).len(),
+            run_start + run.trim_end_matches(|ch| !is_regex_word_char(ch)).len(),
+        )
+    } else {
+        (run_start, run_end)
+    };
+
+    // The cursor must still be inside the trimmed word (e.g., not on the '²' trimmed from "x²").
+    (start <= byte_pos && byte_pos < end).then(|| line[start..end].to_owned())
 }
 
-/// Helper function to check if a character is a "word character" for the purposes of determining word boundaries.
+/// Helper function to check if a character can be part of a word: either an alphanumeric or '_', or a word character
+/// for the regex engine (see [`is_regex_word_char`]).
+///
+/// The two definitions differ: the regex engine also counts combining marks (e.g., U+0301 in a decomposed "café"),
+/// connector punctuation, and join controls, while `char::is_alphanumeric` also counts non-letter numbers (e.g., '²')
+/// and letters from a newer Unicode version than the regex tables. Accepting both keeps every word that either
+/// definition sees as one piece together (e.g., "a²a").
 fn is_word_char(ch: char) -> bool {
-    ch.is_alphanumeric() || ch == '_'
+    ch.is_alphanumeric() || ch == '_' || is_regex_word_char(ch)
+}
+
+/// Helper function to check if a character is a word character for the regex engine, i.e., one that `\w` matches and
+/// that `\b` treats as part of a word.
+fn is_regex_word_char(ch: char) -> bool {
+    // Cannot panic: `Cargo.toml` enables the `unicode-perl` feature that `is_word_character` requires.
+    regex_syntax::is_word_character(ch)
 }
 
 /// Helper function to check whether a given text can produce visible highlights based on the current matching rules.
 ///
-/// With [`MatchOptions::whole_word`] the pattern `\b<escaped>\b` only matches when the first and last characters of the
-/// candidate are word characters. Candidates failing this rule would compile into a regex that never matches, so we use
-/// this predicate to filter them out early at the code action layer rather than letting them sit in `words` invisibly.
+/// With [`MatchOptions::whole_word`] the pattern `\b<escaped>\b` can only match when the first and last characters of
+/// the candidate can be part of a word ([`is_word_char`]). Candidates failing this rule would compile into a regex that
+/// never matches, so we use this predicate to filter them out early at the code action layer rather than letting them
+/// sit in `words` invisibly. [`matches_anywhere`] then performs the exact check against the document.
 fn is_highlightable(text: &str, options: MatchOptions) -> bool {
     if text.is_empty() {
         return false;
@@ -1211,6 +1238,82 @@ mod tests {
         }
     }
 
+    #[test]
+    fn is_word_char_accepts_both_definitions() {
+        for ch in ['\u{301}', '‿', '\u{200D}', '\u{94D}'] {
+            assert!(
+                is_word_char(ch),
+                "U+{:04X} must be a word char because the regex engine treats it as one",
+                u32::from(ch)
+            );
+        }
+        for ch in ['²', '½', '①'] {
+            assert!(
+                is_word_char(ch),
+                "'{ch}' must be a word char because it is alphanumeric"
+            );
+        }
+    }
+
+    // Test `is_regex_word_char`.
+
+    #[test]
+    fn is_regex_word_char_agrees_with_the_regex_engine() {
+        // `compile_word_regex` relies on `\b`, so `is_regex_word_char` must agree with both `\w` and `\b`.
+        let word = Regex::new(r"^\w$").unwrap();
+        let boundary_before = Regex::new(r"^\b").unwrap();
+        for ch in [
+            'a', 'Z', '0', '9', '_', 'é', '中', 'न', '\u{301}', '\u{94D}', '‿', '\u{200D}', '²',
+            '½', '①', ' ', '\t', '.', '-', '(', '😀',
+        ] {
+            let text = ch.to_string();
+            assert_eq!(
+                is_regex_word_char(ch),
+                word.is_match(&text),
+                "U+{:04X} must agree with `\\w`",
+                u32::from(ch)
+            );
+            assert_eq!(
+                is_regex_word_char(ch),
+                boundary_before.is_match(&text),
+                "U+{:04X} must agree with `\\b`",
+                u32::from(ch)
+            );
+        }
+    }
+
+    #[test]
+    fn is_regex_word_char_includes_marks_and_connectors() {
+        assert!(
+            is_regex_word_char('\u{301}'),
+            "a combining mark must be a regex word char"
+        );
+        assert!(
+            is_regex_word_char('\u{94D}'),
+            "the Devanagari virama must be a regex word char"
+        );
+        assert!(
+            is_regex_word_char('‿'),
+            "connector punctuation must be a regex word char"
+        );
+        assert!(
+            is_regex_word_char('\u{200D}'),
+            "a zero-width joiner must be a regex word char"
+        );
+    }
+
+    #[test]
+    fn is_regex_word_char_excludes_non_letter_numbers() {
+        assert!(
+            !is_regex_word_char('²'),
+            "a superscript digit must not be a regex word char"
+        );
+        assert!(
+            !is_regex_word_char('½'),
+            "a vulgar fraction must not be a regex word char"
+        );
+    }
+
     // Test `is_highlightable`.
 
     #[test]
@@ -1352,6 +1455,15 @@ mod tests {
         assert!(
             is_highlightable("foo bar", SUBSTRING),
             "text containing a space must be highlightable in substring mode"
+        );
+    }
+
+    #[test]
+    fn is_highlightable_trailing_combining_mark_in_whole_word_mode_true() {
+        // Decomposed (NFD) "café": the word ends with U+0301, which the regex engine treats as a word char.
+        assert!(
+            is_highlightable("cafe\u{301}", WHOLE_WORD),
+            "a word ending in a combining mark must be highlightable in whole-word mode"
         );
     }
 
@@ -1571,7 +1683,7 @@ mod tests {
         // "let foo = 1;" - select "foo" at UTF-16 chars 4..7.
         let range = make_range(0, 4, 0, 7);
         assert_eq!(
-            word_at("let foo = 1;", range),
+            word_at("let foo = 1;", range, WHOLE_WORD),
             Some("foo".to_owned()),
             "a selection must be returned verbatim"
         );
@@ -1582,7 +1694,7 @@ mod tests {
         // "let foo = 1;" - select " foo " at chars 3..8.
         let range = make_range(0, 3, 0, 8);
         assert_eq!(
-            word_at("let foo = 1;", range),
+            word_at("let foo = 1;", range, WHOLE_WORD),
             Some("foo".to_owned()),
             "whitespace around a selection must be trimmed"
         );
@@ -1593,7 +1705,7 @@ mod tests {
         // "let foo.bar = 1;" - select "foo.bar" at chars 4..11
         let range = make_range(0, 4, 0, 11);
         assert_eq!(
-            word_at("let foo.bar = 1;", range),
+            word_at("let foo.bar = 1;", range, WHOLE_WORD),
             Some("foo.bar".to_owned()),
             "a selection may contain inner non-word chars"
         );
@@ -1603,7 +1715,7 @@ mod tests {
     fn word_at_cursor_in_middle_of_word() {
         // "hello world" - cursor on 'o' (char 4) -> word "hello".
         assert_eq!(
-            word_at("hello world", cursor_range(0, 4)),
+            word_at("hello world", cursor_range(0, 4), WHOLE_WORD),
             Some("hello".to_owned()),
             "a cursor inside a word must expand to the whole word"
         );
@@ -1612,7 +1724,7 @@ mod tests {
     #[test]
     fn word_at_cursor_at_start_of_word() {
         assert_eq!(
-            word_at("hello world", cursor_range(0, 0)),
+            word_at("hello world", cursor_range(0, 0), WHOLE_WORD),
             Some("hello".to_owned()),
             "a cursor on a word's first char must expand to the whole word"
         );
@@ -1622,7 +1734,7 @@ mod tests {
     fn word_at_cursor_just_past_word_end_is_none() {
         // char 5 in "hello world" is the space between the words.
         assert_eq!(
-            word_at("hello world", cursor_range(0, 5)),
+            word_at("hello world", cursor_range(0, 5), WHOLE_WORD),
             None,
             "a cursor just past a word's end (on a space) must yield no word"
         );
@@ -1632,7 +1744,7 @@ mod tests {
     fn word_at_cursor_on_punctuation_is_none() {
         // "foo(bar)" - char 3 is '('.
         assert_eq!(
-            word_at("foo(bar)", cursor_range(0, 3)),
+            word_at("foo(bar)", cursor_range(0, 3), WHOLE_WORD),
             None,
             "a cursor on punctuation must yield no word"
         );
@@ -1642,7 +1754,7 @@ mod tests {
     fn word_at_cursor_on_word_with_underscores() {
         // "some_var = 1;" - cursor on 'v' (char 5).
         assert_eq!(
-            word_at("some_var = 1;", cursor_range(0, 5)),
+            word_at("some_var = 1;", cursor_range(0, 5), WHOLE_WORD),
             Some("some_var".to_owned()),
             "underscores must be part of the word under the cursor"
         );
@@ -1652,7 +1764,7 @@ mod tests {
     fn word_at_single_char_word() {
         // "a b" - cursor on 'a' (char 0) -> word "a".
         assert_eq!(
-            word_at("a b", cursor_range(0, 0)),
+            word_at("a b", cursor_range(0, 0), WHOLE_WORD),
             Some("a".to_owned()),
             "a one-char word must be found"
         );
@@ -1662,7 +1774,7 @@ mod tests {
     fn word_at_end_of_string_no_trailing_space() {
         // "hello" with no trailing space - the right-scan must not overshoot the string end.
         assert_eq!(
-            word_at("hello", cursor_range(0, 0)),
+            word_at("hello", cursor_range(0, 0), WHOLE_WORD),
             Some("hello".to_owned()),
             "the word must extend to the end of the line when nothing follows it"
         );
@@ -1673,7 +1785,7 @@ mod tests {
         let content = "first\nsecond line";
         // line 1, char 0 -> 's' in "second".
         assert_eq!(
-            word_at(content, cursor_range(1, 0)),
+            word_at(content, cursor_range(1, 0), WHOLE_WORD),
             Some("second".to_owned()),
             "the cursor line must select the word on that line"
         );
@@ -1682,7 +1794,7 @@ mod tests {
     #[test]
     fn word_at_nonexistent_line_is_none() {
         assert_eq!(
-            word_at("one line only", cursor_range(99, 0)),
+            word_at("one line only", cursor_range(99, 0), WHOLE_WORD),
             None,
             "a cursor on a line past the end of the document must yield no word"
         );
@@ -1695,7 +1807,7 @@ mod tests {
         let content = "let foo = 1;\nbar baz";
         let range = make_range(0, 4, 1, 3);
         assert_eq!(
-            word_at(content, range),
+            word_at(content, range, WHOLE_WORD),
             Some("foo".to_owned()),
             "a multi-line selection must fall back to the word at its start"
         );
@@ -1707,7 +1819,7 @@ mod tests {
         // "hello" starts at UTF-16 offset 3, ends at offset 8.
         let range = make_range(0, 3, 0, 8);
         assert_eq!(
-            word_at("中文 hello", range),
+            word_at("中文 hello", range, WHOLE_WORD),
             Some("hello".to_owned()),
             "UTF-16 selection offsets must be converted past multibyte chars"
         );
@@ -1717,7 +1829,7 @@ mod tests {
     fn word_at_cursor_after_surrogate_pair() {
         // "😀foo" - emoji is 2 UTF-16 units; 'f' starts at UTF-16 offset 2.
         assert_eq!(
-            word_at("😀foo", cursor_range(0, 2)),
+            word_at("😀foo", cursor_range(0, 2), WHOLE_WORD),
             Some("foo".to_owned()),
             "UTF-16 cursor offsets must account for surrogate pairs"
         );
@@ -1728,7 +1840,7 @@ mod tests {
         // Selecting only whitespace (e.g., a space) should yield None.
         let range = make_range(0, 3, 0, 4); // the space in "foo bar"
         assert_eq!(
-            word_at("foo bar", range),
+            word_at("foo bar", range, WHOLE_WORD),
             None,
             "a whitespace-only selection must yield no word"
         );
@@ -1739,9 +1851,69 @@ mod tests {
         // "café": 'é' (U+00E9) is alphanumeric, so it's a word character. Cursor at UTF-16
         // offset 3 (on 'é') must return the full word "café".
         assert_eq!(
-            word_at("café", cursor_range(0, 3)),
+            word_at("café", cursor_range(0, 3), WHOLE_WORD),
             Some("café".to_owned()),
             "non-ASCII letters must be part of the word under the cursor"
+        );
+    }
+
+    #[test]
+    fn word_at_decomposed_word_includes_combining_mark() {
+        // Decomposed (NFD) "café" is "cafe" + U+0301; the mark is at UTF-16 offset 4.
+        let line = "cafe\u{301} au lait";
+        for character in [0, 3, 4] {
+            assert_eq!(
+                word_at(line, cursor_range(0, character), WHOLE_WORD),
+                Some("cafe\u{301}".to_owned()),
+                "the combining mark must be part of the word (cursor at {character})"
+            );
+        }
+    }
+
+    #[test]
+    fn word_at_word_with_virama_is_not_split() {
+        // "नमस्ते" contains the virama U+094D, a combining mark that `char::is_alphanumeric` rejects.
+        assert_eq!(
+            word_at("नमस्ते दुनिया", cursor_range(0, 0), WHOLE_WORD),
+            Some("नमस्ते".to_owned()),
+            "a word containing a virama must not be split at the virama"
+        );
+    }
+
+    #[test]
+    fn word_at_trims_trailing_non_regex_word_char_in_whole_word_mode() {
+        // `\bx²\b` can't match "x² = 1" (no boundary after '²'), but `\bx\b` can.
+        assert_eq!(
+            word_at("x² = 1", cursor_range(0, 0), WHOLE_WORD),
+            Some("x".to_owned()),
+            "a trailing '²' must be trimmed so that the word can match in whole-word mode"
+        );
+        assert_eq!(
+            word_at("x² = 1", cursor_range(0, 1), WHOLE_WORD),
+            None,
+            "a cursor on the trimmed '²' must yield no word"
+        );
+    }
+
+    #[test]
+    fn word_at_keeps_inner_non_regex_word_char() {
+        // `\ba²a\b` matches "a²a": only the first and last chars must be regex word chars.
+        for character in [0, 1, 2] {
+            assert_eq!(
+                word_at("a²a", cursor_range(0, character), WHOLE_WORD),
+                Some("a²a".to_owned()),
+                "an inner '²' must not split the word (cursor at {character})"
+            );
+        }
+    }
+
+    #[test]
+    fn word_at_does_not_trim_in_substring_mode() {
+        // Substring mode has no `\b`, so there is nothing to trim for.
+        assert_eq!(
+            word_at("x² = 1", cursor_range(0, 1), SUBSTRING),
+            Some("x²".to_owned()),
+            "the whole run must be kept in substring mode"
         );
     }
 }
@@ -2384,6 +2556,44 @@ mod integration {
                 .iter()
                 .any(|title| title == r#"Toggle highlight: "foo.bar""#),
             "selection must yield a toggle action for the full selected text; got: {actions:?}"
+        );
+    }
+
+    /// A decomposed (NFD) word like "cafe" + U+0301 must be offered as a whole and highlighted as a whole. Splitting it
+    /// at the combining mark would produce "cafe", whose `\bcafe\b` pattern never matches because U+0301 is a word
+    /// character for the regex engine, so no toggle action would be offered at all.
+    #[tokio::test]
+    async fn decomposed_word_is_offered_and_highlighted() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "cafe\u{301} au lait").await;
+        let actions = code_action(&mut svc, 1, URI, 0, 0).await;
+        assert!(
+            actions
+                .iter()
+                .any(|title| title == "Toggle highlight: \"cafe\u{301}\""),
+            "the decomposed word must be offered as a whole; got: {actions:?}"
+        );
+        toggle(&mut svc, 2, "cafe\u{301}").await;
+        let data = get_tokens(&mut svc, 3, URI).await;
+        assert_eq!(
+            data,
+            [0, 0, 5, 0, 0],
+            "the whole decomposed word (5 UTF-16 code units) must be highlighted"
+        );
+    }
+
+    /// A word followed by a non-letter number (e.g., "x²") must be offered without it: `\bx²\b` never matches
+    /// "x² = 1" because the regex engine sees no word boundary after '²', while `\bx\b` does.
+    #[tokio::test]
+    async fn word_before_superscript_is_offered_without_it() {
+        let mut svc = make_service().await;
+        open(&mut svc, URI, "x² = 1").await;
+        let actions = code_action(&mut svc, 1, URI, 0, 0).await;
+        assert!(
+            actions
+                .iter()
+                .any(|title| title == r#"Toggle highlight: "x""#),
+            "the word before '²' must be offered; got: {actions:?}"
         );
     }
 }

@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `as_chunks` in integration tests to avoid `clippy::chunks_exact_to_as_chunks`.
 - Release the state lock in `code_action` before scanning the document.
+- Align word boundaries with the regex engine, so that words with combining marks (e.g., decomposed "café") and words next to non-letter numbers (e.g., "x²") get a toggle action.
 
 ## [0.1.4] - 2026-08-08
 

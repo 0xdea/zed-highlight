@@ -1080,6 +1080,7 @@ name = "zed-highlight-lsp"
 version = "0.1.5-alpha"
 dependencies = [
  "regex",
+ "regex-syntax",
  "serde_json",
  "tokio",
  "tower",
