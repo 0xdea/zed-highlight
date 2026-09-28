@@ -3,7 +3,7 @@ members = ["lsp"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.5"
+version = "0.1.6-alpha"
 authors = ["Marco Ivaldi <raptor@0xdeadbeef.info>"]
 edition = "2024"
 homepage = "https://0xdeadbeef.info/"
