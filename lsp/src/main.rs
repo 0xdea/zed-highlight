@@ -13,7 +13,8 @@ use regex::{Regex, RegexBuilder};
 use tokio::sync::Mutex;
 use tokio::{io, task, time};
 use tower_lsp::jsonrpc::Result;
-// Clippy skips `wildcard_imports` in test builds, so the expectation would be unfulfilled there.
+// Clippy skips `wildcard_imports` in test builds, so the expectation would be
+// unfulfilled there.
 #[cfg_attr(
     not(test),
     expect(
@@ -37,15 +38,19 @@ const TOGGLE_COMMAND: &str = "zed-highlight.toggle";
 /// Command that clears all highlights.
 const CLEAR_COMMAND: &str = "zed-highlight.clear";
 
-/// Absolute position of a single match as a (`line`, `start`, `length`, `token_type`) 4-tuple, before delta encoding.
+/// Absolute position of a single match as a (`line`, `start`, `length`,
+/// `token_type`) 4-tuple, before delta encoding.
 type RawToken = (u32, u32, u32, u32);
 
-/// These names are arbitrary strings that the LSP advertises as its semantic token type legend. Zed looks them up in
-/// `global_lsp_settings.semantic_token_rules` (settings.json file) to map each name to a foreground/background color.
+/// These names are arbitrary strings that the LSP advertises as its semantic
+/// token type legend. Zed looks them up in
+/// `global_lsp_settings.semantic_token_rules` (settings.json file) to map each
+/// name to a foreground/background color.
 ///
 /// # Examples
 ///
-/// `global_lsp_settings` snippet for the dark theme (8 highlight colors with 50% opacity backgrounds):
+/// `global_lsp_settings` snippet for the dark theme (8 highlight colors with
+/// 50% opacity backgrounds):
 /// ```json
 /// "global_lsp_settings": {
 ///   "semantic_token_rules": [
@@ -74,15 +79,17 @@ static TOKEN_TYPE_NAMES: [&str; NUM_COLORS] = [
 /// Matching rules applied to every highlighted word.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct MatchOptions {
-    /// Whether to only match whole words (e.g., "for" doesn't match inside "format").
+    /// Whether to only match whole words (e.g., "for" doesn't match inside
+    /// "format").
     whole_word: bool,
     /// Whether to ignore case when matching (e.g., "Foo" matches "foo").
     ignore_case: bool,
 }
 
 impl Default for MatchOptions {
-    /// Returns the default matching rules: [`MatchOptions::whole_word`] is enabled and [`MatchOptions::ignore_case`] is
-    /// disabled. This should be a sensible default behavior, and we can consider making these rules configurable later.
+    /// Returns the default matching rules: [`MatchOptions::whole_word`] is enabled
+    /// and [`MatchOptions::ignore_case`] is disabled. This should be a sensible
+    /// default behavior, and we can consider making these rules configurable later.
     fn default() -> Self {
         Self {
             whole_word: true,
@@ -93,18 +100,23 @@ impl Default for MatchOptions {
 
 /// LSP server's internal state.
 ///
-/// We track the list of highlighted words and the full text of every open document so we can scan for token positions
-/// on demand. We also track the user's matching rules. All state is kept in memory and shared across all documents and
-/// tabs, so highlighting a word in one file highlights it in all files.
+/// We track the list of highlighted words and the full text of every open
+/// document so we can scan for token positions on demand. We also track the
+/// user's matching rules. All state is kept in memory and shared across all
+/// documents and tabs, so highlighting a word in one file highlights it in all
+/// files.
 ///
-/// The derived [`Default`] starts with no words, no documents, and the default [`MatchOptions`].
+/// The derived [`Default`] starts with no words, no documents, and the default
+/// [`MatchOptions`].
 #[derive(Default)]
 struct State {
-    /// The list of currently highlighted words. A removed slot becomes `None` and subsequent entries are not shifted.
+    /// The list of currently highlighted words. A removed slot becomes `None` and
+    /// subsequent entries are not shifted.
     words: Vec<Option<String>>,
 
-    /// Full text of every open document, keyed by URI. Stored behind `Arc` so handlers ([`Backend::build_tokens`] and
-    /// [`Backend::code_action`]) can take a cheap clone under the state lock and release it before scanning, instead of
+    /// Full text of every open document, keyed by URI. Stored behind `Arc` so
+    /// handlers ([`Backend::build_tokens`] and [`Backend::code_action`]) can take a
+    /// cheap clone under the state lock and release it before scanning, instead of
     /// duplicating the entire document on every request.
     docs: HashMap<Url, Arc<str>>,
 
@@ -116,21 +128,27 @@ impl State {
     /// Toggles a word in/out of the highlight list.
     ///
     /// Three cases:
-    /// 1. Word is already in the list: soft-delete it preserving the slot (set its slot to `None`).
-    /// 2. Word is new and there's a `None` slot: reuse the first free slot so we reclaim the color index.
-    /// 3. Word is new and there are no free slots: grow the list appending a new `Some(word)`.
+    /// 1. Word is already in the list: soft-delete it preserving the slot (set its
+    ///    slot to `None`).
+    /// 2. Word is new and there's a `None` slot: reuse the first free slot so we
+    ///    reclaim the color index.
+    /// 3. Word is new and there are no free slots: grow the list appending a new
+    ///    `Some(word)`.
     fn toggle(&mut self, word: &str) {
         if let Some(idx) = self.words.iter().position(|slot| {
             slot.as_deref()
                 .is_some_and(|existing| self.words_eq(existing, word))
         }) {
-            // Case 1: Word is already in the list: soft-delete it preserving the slot (set its slot to `None`).
+            // Case 1: Word is already in the list: soft-delete it preserving the slot (set
+            // its slot to `None`).
             self.words[idx] = None;
         } else if let Some(slot) = self.words.iter_mut().find(|slot| slot.is_none()) {
-            // Case 2: Word is new and there's a `None` slot: reuse the first free slot so we reclaim the color index.
+            // Case 2: Word is new and there's a `None` slot: reuse the first free slot so
+            // we reclaim the color index.
             *slot = Some(word.to_owned());
         } else {
-            // Case 3: Word is new and there are no free slots: grow the list appending a new `Some(word)`.
+            // Case 3: Word is new and there are no free slots: grow the list appending a
+            // new `Some(word)`.
             self.words.push(Some(word.to_owned()));
         }
     }
@@ -145,7 +163,8 @@ impl State {
         self.words.clear();
     }
 
-    /// Helper function to compare two words for equality, respecting [`MatchOptions::ignore_case`].
+    /// Helper function to compare two words for equality, respecting
+    /// [`MatchOptions::ignore_case`].
     fn words_eq(&self, left: &str, right: &str) -> bool {
         if self.options.ignore_case {
             left.to_lowercase() == right.to_lowercase()
@@ -157,12 +176,15 @@ impl State {
 
 /// LSP server's backend.
 ///
-/// This struct holds the shared state and implements the [`LanguageServer`] trait that tower-lsp dispatches to. Each
-/// method corresponds to a particular LSP request/notification that Zed sends us. The main logic is in
-/// [`Backend::build_tokens`], which scans the document for matches and encodes the token positions in the format
-/// required by the LSP semantic tokens protocol.
+/// This struct holds the shared state and implements the [`LanguageServer`]
+/// trait that tower-lsp dispatches to. Each method corresponds to a particular
+/// LSP request/notification that Zed sends us. The main logic is in
+/// [`Backend::build_tokens`], which scans the document for matches and encodes
+/// the token positions in the format required by the LSP semantic tokens
+/// protocol.
 struct Backend {
-    /// The tower-lsp client handle used to send requests (e.g., `workspace/semanticTokens/refresh`) to Zed.
+    /// The tower-lsp client handle used to send requests (e.g.,
+    /// `workspace/semanticTokens/refresh`) to Zed.
     client: Client,
 
     /// Shared mutable state behind a tokio async `Mutex`.
@@ -182,12 +204,16 @@ impl Backend {
         }
     }
 
-    /// Cancels any pending debounced refresh and sends a `workspace/semanticTokens/refresh` request to Zed right now.
-    /// Used after user-driven actions (toggle/clear) where we want the highlight change to appear without delay.
+    /// Cancels any pending debounced refresh and sends a
+    /// `workspace/semanticTokens/refresh` request to Zed right now. Used after
+    /// user-driven actions (toggle/clear) where we want the highlight change to
+    /// appear without delay.
     ///
-    /// Zed does not implement `workspace/codeAction/refresh`, so it cannot be signalled to re-fetch code actions
-    /// after a state change. The code action titles are therefore kept stateless (see [`Backend::code_action`])
-    /// so that Zed's cached response remains accurate regardless of the direction of the last toggle.
+    /// Zed does not implement `workspace/codeAction/refresh`, so it cannot be
+    /// signalled to re-fetch code actions after a state change. The code action
+    /// titles are therefore kept stateless (see [`Backend::code_action`]) so that
+    /// Zed's cached response remains accurate regardless of the direction of the
+    /// last toggle.
     async fn immediate_refresh(&self) {
         // Cancel any pending debounced refresh.
         let refresh_handle = self.refresh_handle.lock().await.take();
@@ -195,15 +221,17 @@ impl Backend {
             handle.abort();
         }
 
-        // Send the refresh request to Zed. Errors are deliberately ignored: the refresh is best-effort (e.g., it fails
-        // if the client has disconnected) and there is no fallback to try. If it fails, a toggle or clear only becomes
-        // visible once Zed re-requests tokens on its own (e.g., after the next edit).
+        // Send the refresh request to Zed. Errors are deliberately ignored: the refresh
+        // is best-effort (e.g., it fails if the client has disconnected) and there is
+        // no fallback to try. If it fails, a toggle or clear only becomes visible once
+        // Zed re-requests tokens on its own (e.g., after the next edit).
         _ = self.client.semantic_tokens_refresh().await;
     }
 
-    /// Schedules a `workspace/semanticTokens/refresh` request after a short idle delay, cancelling any previously
-    /// scheduled one. Classic debounce pattern: rapid events (keystrokes) keep resetting the timer; the refresh only
-    /// fires once the user pauses.
+    /// Schedules a `workspace/semanticTokens/refresh` request after a short idle
+    /// delay, cancelling any previously scheduled one. Classic debounce pattern:
+    /// rapid events (keystrokes) keep resetting the timer; the refresh only fires
+    /// once the user pauses.
     async fn debounced_refresh(&self) {
         let mut guard = self.refresh_handle.lock().await;
 
@@ -216,22 +244,24 @@ impl Backend {
         let client = self.client.clone();
         *guard = Some(tokio::spawn(async move {
             time::sleep(Duration::from_millis(DEBOUNCE_DELAY_MS)).await;
-            // Errors are deliberately ignored: this refresh always follows an edit, after which Zed re-requests tokens
-            // on its own anyway.
+            // Errors are deliberately ignored: this refresh always follows an edit, after
+            // which Zed re-requests tokens on its own anyway.
             _ = client.semantic_tokens_refresh().await;
         }));
     }
 
     /// Builds the full list of [`SemanticTokens`] for a document.
     ///
-    /// The LSP semantic tokens protocol requires tokens to be encoded as a flat array of [`SemanticToken`] 5-tuples in
-    /// document order, where each position is expressed as a delta from the previous token (not an absolute position).
+    /// The LSP semantic tokens protocol requires tokens to be encoded as a flat
+    /// array of [`SemanticToken`] 5-tuples in document order, where each position
+    /// is expressed as a delta from the previous token (not an absolute position).
     /// This lets the client decode the stream in one pass without random access.
     ///
-    /// Character offsets must be in UTF-16 code units because that is what the LSP spec mandates.
+    /// Character offsets must be in UTF-16 code units because that is what the LSP
+    /// spec mandates.
     #[expect(
         clippy::cast_possible_truncation,
-        reason = "line indices fit in `u32` for any realistic document, and LSP positions are `u32` anyway"
+        reason = "color indices are below `NUM_COLORS`, and real documents have under 2^32 lines"
     )]
     #[expect(
         clippy::integer_division_remainder_used,
@@ -239,11 +269,11 @@ impl Backend {
     )]
     #[expect(
         clippy::as_conversions,
-        reason = "the color index is below `NUM_COLORS` after the modulo, and line indices are covered above"
+        reason = "both casts are lossless, as explained for `cast_possible_truncation` above"
     )]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "tokens are sorted by (`line`, `start`), so neither delta subtraction can underflow"
+        reason = "tokens are sorted by (`line`, `start`), so no delta subtraction can underflow"
     )]
     async fn build_tokens(&self, uri: &Url) -> Vec<SemanticToken> {
         // Snapshot the state and release the lock.
@@ -272,7 +302,8 @@ impl Backend {
                 continue;
             };
 
-            // Color index wraps around if more than `NUM_COLORS` words are highlighted simultaneously.
+            // Color index wraps around if more than `NUM_COLORS` words are highlighted
+            // simultaneously.
             let token_type = (color_idx % NUM_COLORS) as u32;
 
             for (line_idx, line) in content.lines().enumerate() {
@@ -285,8 +316,9 @@ impl Backend {
             }
         }
 
-        // Sort by (`line`, `start`). Tuples compare lexicographically, so tokens overlapping at the same position are
-        // deterministically ordered by `length` and then by `token_type`.
+        // Sort by (`line`, `start`). Tuples compare lexicographically, so tokens
+        // overlapping at the same position are deterministically ordered by `length`
+        // and then by `token_type`.
         raw.sort_unstable();
 
         // Convert absolute positions to the LSP delta encoding.
@@ -324,8 +356,9 @@ impl Backend {
 
 /// LSP server's implementation.
 ///
-/// We implement the [`LanguageServer`] trait from tower-lsp, which requires to define an async method for each LSP
-/// request/notification we want to handle. The [`Backend`] struct holds the shared state and client handle, and we
+/// We implement the [`LanguageServer`] trait from tower-lsp, which requires to
+/// define an async method for each LSP request/notification we want to handle.
+/// The [`Backend`] struct holds the shared state and client handle, and we
 /// dispatch to helper methods for the main logic.
 #[tower_lsp::async_trait]
 #[expect(
@@ -333,7 +366,8 @@ impl Backend {
     reason = "we need only a subset of the trait methods"
 )]
 impl LanguageServer for Backend {
-    /// Called once at server startup. We respond with our capabilities so Zed knows which features we support.
+    /// Called once at server startup. We respond with our capabilities so Zed knows
+    /// which features we support.
     async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
@@ -342,9 +376,10 @@ impl LanguageServer for Backend {
                     TextDocumentSyncKind::FULL,
                 )),
 
-                // Advertise our semantic token legend. The legend is the list of token type names we will use in
-                // responses; the client maps each name to a visual style. We declare no modifiers (bold, italic, etc.)
-                // because we only need colors. We advertise full tokens only (not range or delta).
+                // Advertise our semantic token legend. The legend is the list of token type
+                // names we will use in responses; the client maps each name to a visual style.
+                // We declare no modifiers (bold, italic, etc.) because we only need colors. We
+                // advertise full tokens only (not range or delta).
                 semantic_tokens_provider: Some(
                     SemanticTokensServerCapabilities::SemanticTokensOptions(
                         SemanticTokensOptions {
@@ -362,12 +397,14 @@ impl LanguageServer for Backend {
                     ),
                 ),
 
-                // Code actions appear in the "editor: toggle code actions" menu (accessed with the `⌘.`/`Ctrl+.`
-                // shortcut or the lightning bolt icon in the gutter). We use them to surface the `Toggle highlight:
-                // <word>` and `Clear all highlights` actions.
+                // Code actions appear in the "editor: toggle code actions" menu (accessed with
+                // the `⌘.`/`Ctrl+.` shortcut or the lightning bolt icon in the gutter). We use
+                // them to surface the `Toggle highlight: <word>` and `Clear all highlights`
+                // actions.
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
 
-                // Register each supported command name so Zed knows to route `executeCommand` calls to this server.
+                // Register each supported command name so Zed knows to route `executeCommand`
+                // calls to this server.
                 execute_command_provider: Some(ExecuteCommandOptions {
                     commands: vec![TOGGLE_COMMAND.to_owned(), CLEAR_COMMAND.to_owned()],
                     work_done_progress_options: WorkDoneProgressOptions::default(),
@@ -384,18 +421,22 @@ impl LanguageServer for Backend {
         })
     }
 
-    /// Called after [`Backend::initialize`], once the client is ready to receive requests. Empty in our simple server.
+    /// Called after [`Backend::initialize`], once the client is ready to receive
+    /// requests. Empty in our simple server.
     async fn initialized(&self, _: InitializedParams) {}
 
-    /// Called when the server is shutting down. We have no resources to clean up in our simple server.
+    /// Called when the server is shutting down. We have no resources to clean up in
+    /// our simple server.
     async fn shutdown(&self) -> Result<()> {
         Ok(())
     }
 
-    /// Called when Zed opens a document for the first time (not on every tab switch to an already-open file).
+    /// Called when Zed opens a document for the first time (not on every tab switch
+    /// to an already-open file).
     ///
-    /// To prevent race conditions, after storing the document we schedule a debounced refresh, which asks Zed to
-    /// re-request tokens [`DEBOUNCE_DELAY_MS`] later, by which time `state.docs` is guaranteed to be up to date.
+    /// To prevent race conditions, after storing the document we schedule a
+    /// debounced refresh, which asks Zed to re-request tokens [`DEBOUNCE_DELAY_MS`]
+    /// later, by which time `state.docs` is guaranteed to be up to date.
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         // Store the document text in `state.docs`.
         let has_any = {
@@ -406,7 +447,8 @@ impl LanguageServer for Backend {
             state.has_any()
         };
 
-        // Schedule a debounced refresh to update the tokens if there are highlighted words.
+        // Schedule a debounced refresh to update the tokens if there are highlighted
+        // words.
         if has_any {
             self.debounced_refresh().await;
         }
@@ -414,13 +456,15 @@ impl LanguageServer for Backend {
 
     /// Called on every document edit.
     ///
-    /// [`Backend::debounced_refresh`] is the safety net that corrects any stale token response once typing pauses.
+    /// [`Backend::debounced_refresh`] is the safety net that corrects any stale
+    /// token response once typing pauses.
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         // Update the document text in `state.docs`.
         let has_any = {
             let mut state = self.state.lock().await;
-            // With FULL sync, there should always be exactly one content change with the full new text, but we
-            // defensively handle the case where it's missing just in case.
+            // With FULL sync, there should always be exactly one content change with the
+            // full new text, but we defensively handle the case where it's missing just in
+            // case.
             if let Some(change) = params.content_changes.into_iter().last() {
                 state
                     .docs
@@ -429,7 +473,8 @@ impl LanguageServer for Backend {
             state.has_any()
         };
 
-        // Schedule a debounced refresh to update the tokens if there are highlighted words.
+        // Schedule a debounced refresh to update the tokens if there are highlighted
+        // words.
         if has_any {
             self.debounced_refresh().await;
         }
@@ -437,7 +482,8 @@ impl LanguageServer for Backend {
 
     /// Called when a document is closed.
     ///
-    /// We evict the document to reclaim memory; if the file is reopened, `did_open` will re-populate `state.docs`.
+    /// We evict the document to reclaim memory; if the file is reopened, `did_open`
+    /// will re-populate `state.docs`.
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         self.state
             .lock()
@@ -446,7 +492,8 @@ impl LanguageServer for Backend {
             .remove(&params.text_document.uri);
     }
 
-    /// Called whenever Zed wants the current highlight tokens for a document, which happens:
+    /// Called whenever Zed wants the current highlight tokens for a document, which
+    /// happens:
     /// - When the document first opens.
     /// - After each [`Backend::did_change`] (Zed's own auto-request).
     /// - In response to our `workspace/semanticTokens/refresh` request.
@@ -470,11 +517,13 @@ impl LanguageServer for Backend {
     /// - `Toggle highlight: <word>` (if cursor is on a valid word or selection).
     /// - `Clear all highlights` (only if there are any active highlights).
     ///
-    /// The toggle action deliberately uses a stateless title ("Toggle highlight") rather than a state-dependent one
-    /// ("Highlight" vs "Remove highlight"). Zed caches code action responses by cursor position and only invalidates
-    /// that cache on cursor movement or document edits. A stateless title is therefore always accurate regardless of
-    /// when Zed last fetched the response, and avoids the confusing mismatch of seeing "Highlight: foo" when the word
-    /// is already highlighted (or vice versa) without the user having moved their cursor.
+    /// The toggle action deliberately uses a stateless title ("Toggle highlight")
+    /// rather than a state-dependent one ("Highlight" vs "Remove highlight"). Zed
+    /// caches code action responses by cursor position and only invalidates that
+    /// cache on cursor movement or document edits. A stateless title is therefore
+    /// always accurate regardless of when Zed last fetched the response, and avoids
+    /// the confusing mismatch of seeing "Highlight: foo" when the word is already
+    /// highlighted (or vice versa) without the user having moved their cursor.
     async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
         // Snapshot the state and release the lock before scanning the document.
         let (content, has_any, options) = {
@@ -498,8 +547,9 @@ impl LanguageServer for Backend {
             actions.push(CodeActionOrCommand::CodeAction(CodeAction {
                 title: format!("Toggle highlight: \"{word}\""),
                 kind: Some(CodeActionKind::EMPTY),
-                // The [`Command`] is embedded in the [`CodeAction`] and passed back to [`Backend::execute_command`]
-                // when the user selects this item. We encode the word as the single argument.
+                // The [`Command`] is embedded in the [`CodeAction`] and passed back to
+                // [`Backend::execute_command`] when the user selects this item. We encode the
+                // word as the single argument.
                 command: Some(Command {
                     title: "Toggle Highlight".to_owned(),
                     command: TOGGLE_COMMAND.to_owned(),
@@ -526,9 +576,11 @@ impl LanguageServer for Backend {
         Ok(Some(actions))
     }
 
-    /// Called when the user selects a code action in the "editor: toggle code actions" menu.
+    /// Called when the user selects a code action in the "editor: toggle code
+    /// actions" menu.
     ///
-    /// We mutate state, then call [`Backend::immediate_refresh`] to tell Zed to re-request semantic tokens right away.
+    /// We mutate state, then call [`Backend::immediate_refresh`] to tell Zed to
+    /// re-request semantic tokens right away.
     async fn execute_command(
         &self,
         params: ExecuteCommandParams,
@@ -574,14 +626,17 @@ impl LanguageServer for Backend {
     }
 }
 
-/// Helper function to count the number of UTF-16 code units in a UTF-8 string slice.
+/// Helper function to count the number of UTF-16 code units in a UTF-8 string
+/// slice.
 ///
-/// The count saturates at `u32::MAX`, the largest offset an LSP position can hold.
+/// The count saturates at `u32::MAX`, the largest offset an LSP position can
+/// hold.
 fn utf16_len(text: &str) -> u32 {
     u32::try_from(text.encode_utf16().count()).unwrap_or(u32::MAX)
 }
 
-/// Helper function to convert a UTF-16 character offset to a byte offset within `text`.
+/// Helper function to convert a UTF-16 character offset to a byte offset within
+/// `text`.
 fn utf16_to_byte(text: &str, utf16_offset: usize) -> Option<usize> {
     let mut count = 0_usize;
     for (byte_idx, ch) in text.char_indices() {
@@ -589,21 +644,26 @@ fn utf16_to_byte(text: &str, utf16_offset: usize) -> Option<usize> {
         if count == utf16_offset {
             return Some(byte_idx);
         }
-        // Cannot saturate in practice: the UTF-16 count never exceeds the byte length of `text`.
+        // Cannot saturate in practice: the UTF-16 count never exceeds the byte length
+        // of `text`.
         count = count.saturating_add(ch.len_utf16());
     }
-    // Returns `None` if the offset is past the end of the string (shouldn't happen with valid LSP data).
+    // Returns `None` if the offset is past the end of the string (shouldn't happen
+    // with valid LSP data).
     (count == utf16_offset).then_some(text.len())
 }
 
-/// Helper function to return the word the user is acting on, given the cursor range from a code action request.
+/// Helper function to return the word the user is acting on, given the cursor
+/// range from a code action request.
 ///
 /// Two cases:
 /// 1. Non-empty single-line selection: use the selected text directly.
-/// 2. Cursor (empty range, or multi-line): find the word under the cursor by scanning backwards and forwards.
+/// 2. Cursor (empty range, or multi-line): find the word under the cursor by
+///    scanning backwards and forwards.
 ///
-/// "Word characters" are the regex engine's `\w` (see [`is_word_char`]): letters, digits, combining marks, and
-/// connector punctuation such as underscore, which covers identifiers in source code.
+/// "Word characters" are the regex engine's `\w` (see [`is_word_char`]):
+/// letters, digits, combining marks, and connector punctuation such as
+/// underscore, which covers identifiers in source code.
 #[expect(
     clippy::as_conversions,
     reason = "`u32` to `usize` is lossless: `usize` is at least 32 bits on every supported target"
@@ -613,10 +673,12 @@ fn utf16_to_byte(text: &str, utf16_offset: usize) -> Option<usize> {
     reason = "`end` is at most `line.len()`, so the additions cannot overflow"
 )]
 fn word_at(content: &str, range: Range) -> Option<String> {
-    // Get the line where the cursor is. If the line is missing (shouldn't happen with valid LSP data), return None.
+    // Get the line where the cursor is. If the line is missing (shouldn't happen
+    // with valid LSP data), return None.
     let line = content.lines().nth(range.start.line as usize)?;
 
-    // Case 1: Use the non-empty single-line selection directly (multi-line selections fall through to case 2).
+    // Case 1: Use the non-empty single-line selection directly (multi-line
+    // selections fall through to case 2).
     if range.start.line == range.end.line && range.start.character != range.end.character {
         let sel_start = utf16_to_byte(line, range.start.character as usize)?;
         let sel_end = utf16_to_byte(line, range.end.character as usize)?;
@@ -631,7 +693,8 @@ fn word_at(content: &str, range: Range) -> Option<String> {
     // Case 2: Find the word under the cursor.
     let byte_pos = utf16_to_byte(line, range.start.character as usize)?;
 
-    // If the cursor is on a non-word character, there's nothing to highlight (cursor is on a space or punctuation).
+    // If the cursor is on a non-word character, there's nothing to highlight
+    // (cursor is on a space or punctuation).
     if !line[byte_pos..].chars().next().is_some_and(is_word_char) {
         return None;
     }
@@ -655,22 +718,29 @@ fn word_at(content: &str, range: Range) -> Option<String> {
     (start < end).then(|| line[start..end].to_owned())
 }
 
-/// Helper function to check if a character is a "word character" for the purposes of determining word boundaries.
+/// Helper function to check if a character is a "word character" for the
+/// purposes of determining word boundaries.
 ///
-/// This is the regex engine's own definition (the one behind `\w` and `\b`), so that a word found by [`word_at`] can
-/// always be matched by the `\b<word>\b` pattern built by [`compile_word_regex`]. It includes combining marks (e.g.,
-/// U+0301 in a decomposed "café", or the Devanagari virama), which `char::is_alphanumeric` rejects, and it excludes
-/// non-letter numbers (e.g., '²'), which `char::is_alphanumeric` accepts.
+/// This is the regex engine's own definition (the one behind `\w` and `\b`), so
+/// that a word found by [`word_at`] can always be matched by the `\b<word>\b`
+/// pattern built by [`compile_word_regex`]. It includes combining marks (e.g.,
+/// U+0301 in a decomposed "café", or the Devanagari virama), which
+/// `char::is_alphanumeric` rejects, and it excludes non-letter numbers (e.g.,
+/// '²'), which `char::is_alphanumeric` accepts.
 fn is_word_char(ch: char) -> bool {
-    // Cannot panic: `Cargo.toml` enables the `unicode-perl` feature that `is_word_character` requires.
+    // Cannot panic: `Cargo.toml` enables the `unicode-perl` feature that
+    // `is_word_character` requires.
     regex_syntax::is_word_character(ch)
 }
 
-/// Helper function to check whether a given text can produce visible highlights based on the current matching rules.
+/// Helper function to check whether a given text can produce visible highlights
+/// based on the current matching rules.
 ///
-/// With [`MatchOptions::whole_word`] the pattern `\b<escaped>\b` only matches when the first and last characters of the
-/// candidate are word characters. Candidates failing this rule would compile into a regex that never matches, so we use
-/// this predicate to filter them out early at the code action layer rather than letting them sit in `words` invisibly.
+/// With [`MatchOptions::whole_word`] the pattern `\b<escaped>\b` only matches
+/// when the first and last characters of the candidate are word characters.
+/// Candidates failing this rule would compile into a regex that never matches,
+/// so we use this predicate to filter them out early at the code action layer
+/// rather than letting them sit in `words` invisibly.
 fn is_highlightable(text: &str, options: MatchOptions) -> bool {
     if text.is_empty() {
         return false;
@@ -685,11 +755,13 @@ fn is_highlightable(text: &str, options: MatchOptions) -> bool {
     starts_ok && ends_ok
 }
 
-/// Helper function to check whether a given text produces at least one visible highlight in the current document under
-/// the current matching rules. We do not match in all open documents.
+/// Helper function to check whether a given text produces at least one visible
+/// highlight in the current document under the current matching rules. We do
+/// not match in all open documents.
 ///
-/// This is the strongest predicate we can use to decide if a code action menu entry is worth showing: it asks the
-/// exact question whose answer determines whether the user would see anything change after toggling, at a somewhat
+/// This is the strongest predicate we can use to decide if a code action menu
+/// entry is worth showing: it asks the exact question whose answer determines
+/// whether the user would see anything change after toggling, at a somewhat
 /// negligible performance cost.
 fn matches_anywhere(content: &str, text: &str, options: MatchOptions) -> bool {
     let Some(re) = compile_word_regex(text, options) else {
@@ -698,10 +770,12 @@ fn matches_anywhere(content: &str, text: &str, options: MatchOptions) -> bool {
     content.lines().any(|line| re.is_match(line))
 }
 
-/// Helper function to compile a regex for a given word, escaping it first so that punctuation is treated literally, and
-/// respecting the given [`MatchOptions`].
+/// Helper function to compile a regex for a given word, escaping it first so
+/// that punctuation is treated literally, and respecting the given
+/// [`MatchOptions`].
 ///
-/// Returns `None` if the pattern fails to compile (unlikely for an escaped literal).
+/// Returns `None` if the pattern fails to compile (unlikely for an escaped
+/// literal).
 fn compile_word_regex(word: &str, options: MatchOptions) -> Option<Regex> {
     // Treat the word as a literal string by escaping it.
     let escaped = regex::escape(word);
@@ -719,9 +793,10 @@ fn compile_word_regex(word: &str, options: MatchOptions) -> Option<Regex> {
 
 /// Entry point of the LSP server.
 ///
-/// LSP servers communicate over `stdin`/`stdout`; tower-lsp handles the JSON-RPC framing and dispatches each message to
-/// the appropriate handler on the [`Backend`]. The server runs until `stdin` is closed (i.e., until the editor exits or
-/// restarts the language server).
+/// LSP servers communicate over `stdin`/`stdout`; tower-lsp handles the
+/// JSON-RPC framing and dispatches each message to the appropriate handler on
+/// the [`Backend`]. The server runs until `stdin` is closed (i.e., until the
+/// editor exits or restarts the language server).
 #[tokio::main]
 async fn main() {
     let stdin = io::stdin();
@@ -766,8 +841,8 @@ mod tests {
 
     // Helper functions.
 
-    /// Builds a [`Range`] from `start_line`/`start_char` to `end_line`/`end_char` (character offsets in UTF-16 code
-    /// units, as in LSP).
+    /// Builds a [`Range`] from `start_line`/`start_char` to `end_line`/`end_char`
+    /// (character offsets in UTF-16 code units, as in LSP).
     fn make_range(start_line: u32, start_char: u32, end_line: u32, end_char: u32) -> Range {
         Range {
             start: Position {
@@ -781,7 +856,8 @@ mod tests {
         }
     }
 
-    /// Builds an empty [`Range`] at `line`/`character`, i.e., a bare cursor with no selection.
+    /// Builds an empty [`Range`] at `line`/`character`, i.e., a bare cursor with no
+    /// selection.
     fn cursor_range(line: u32, character: u32) -> Range {
         make_range(line, character, line, character)
     }
@@ -1210,7 +1286,8 @@ mod tests {
 
     #[test]
     fn is_word_char_agrees_with_the_regex_engine() {
-        // `compile_word_regex` relies on `\b`, so `is_word_char` must agree with both `\w` and `\b`.
+        // `compile_word_regex` relies on `\b`, so `is_word_char` must agree with both
+        // `\w` and `\b`.
         let word = Regex::new(r"^\w$").unwrap();
         let boundary_before = Regex::new(r"^\b").unwrap();
         for ch in [
@@ -1387,8 +1464,9 @@ mod tests {
         );
     }
 
-    // TODO: The behavior of `is_highlightable` without whole-word mode with non-word characters is somewhat debatable.
-    // We should probably refine it if `whole_word` ever becomes user-configurable. Leave as-is for the time being.
+    // TODO: The behavior of `is_highlightable` without whole-word mode with
+    // non-word characters is somewhat debatable. We should probably refine it if
+    // `whole_word` ever becomes user-configurable. Leave as-is for the time being.
     #[test]
     fn is_highlightable_any_nonempty_selection_without_whole_word_mode_true() {
         assert!(
@@ -1411,7 +1489,8 @@ mod tests {
 
     #[test]
     fn is_highlightable_trailing_combining_mark_in_whole_word_mode_true() {
-        // Decomposed (NFD) "café": the word ends with U+0301, which the regex engine treats as a word char.
+        // Decomposed (NFD) "café": the word ends with U+0301, which the regex engine
+        // treats as a word char.
         assert!(
             is_highlightable("cafe\u{301}", WHOLE_WORD),
             "a word ending in a combining mark must be highlightable in whole-word mode"
@@ -1623,7 +1702,7 @@ mod tests {
         );
         assert!(
             !matches_anywhere("Format()", "for", WHOLE_WORD_IGNORE_CASE),
-            "'for' should not match inside 'Format' even with ignore_case enabled when whole_word is enabled"
+            "whole-word mode must not match 'for' inside 'Format', even ignoring case"
         );
     }
 
@@ -1723,7 +1802,8 @@ mod tests {
 
     #[test]
     fn word_at_end_of_string_no_trailing_space() {
-        // "hello" with no trailing space - the right-scan must not overshoot the string end.
+        // "hello" with no trailing space - the right-scan must not overshoot the string
+        // end.
         assert_eq!(
             word_at("hello", cursor_range(0, 0)),
             Some("hello".to_owned()),
@@ -1823,7 +1903,8 @@ mod tests {
 
     #[test]
     fn word_at_word_with_virama_is_not_split() {
-        // "नमस्ते" contains the virama U+094D, a combining mark that `char::is_alphanumeric` rejects.
+        // "नमस्ते" contains the virama U+094D, a combining mark that
+        // `char::is_alphanumeric` rejects.
         assert_eq!(
             word_at("नमस्ते दुनिया", cursor_range(0, 0)),
             Some("नमस्ते".to_owned()),
@@ -1848,8 +1929,9 @@ mod tests {
 
     #[test]
     fn word_at_splits_word_at_non_letter_number() {
-        // Known limitation (see `CLAUDE.md`): '²' is not a regex word char, so "a²a" is two words, "a" and "a".
-        // Selecting "a²a" explicitly still highlights it as a whole.
+        // Known limitation (see `CLAUDE.md`): '²' is not a regex word char, so "a²a" is
+        // two words, "a" and "a". Selecting "a²a" explicitly still highlights it as a
+        // whole.
         assert_eq!(
             word_at("a²a", cursor_range(0, 0)),
             Some("a".to_owned()),
@@ -1874,7 +1956,8 @@ mod integration {
     /// Service type used across all integration tests.
     type Svc = LspService<Backend>;
 
-    /// Stable document URI reused by all tests; the service is fresh per test so there's no cross-test state.
+    /// Stable document URI reused by all tests; the service is fresh per test so
+    /// there's no cross-test state.
     const URI: &str = "file:///test.txt";
 
     /// A second stable document URI for multi-document tests.
@@ -1882,17 +1965,20 @@ mod integration {
 
     // Helper functions.
 
-    /// Serializes `req` as a JSON-RPC request, drives it through the service, and returns the serialized response.
-    /// Notifications (no `id` field) produce `None`; requests produce `Some(response_json)`.
+    /// Serializes `req` as a JSON-RPC request, drives it through the service, and
+    /// returns the serialized response. Notifications (no `id` field) produce
+    /// `None`; requests produce `Some(response_json)`.
     async fn call_inner(svc: &mut Svc, req: serde_json::Value) -> Option<serde_json::Value> {
         let req: jsonrpc::Request = serde_json::from_value(req).unwrap();
         let res = svc.ready().await.unwrap().call(req).await.unwrap();
         res.map(|response| serde_json::to_value(response).unwrap())
     }
 
-    /// Creates a fresh service and completes the mandatory LSP handshake (`initialize` -> `initialized`).
-    /// The `ClientSocket` (used for server-to-client notifications) is dropped immediately; the backend
-    /// ignores send errors with `_ =`, so this is safe and avoids keeping a handle we don't need.
+    /// Creates a fresh service and completes the mandatory LSP handshake
+    /// (`initialize` -> `initialized`). The `ClientSocket` (used for
+    /// server-to-client notifications) is dropped immediately; the backend ignores
+    /// send errors with `_ =`, so this is safe and avoids keeping a handle we don't
+    /// need.
     async fn make_service() -> Svc {
         let (mut svc, socket) = LspService::new(Backend::new);
         drop(
@@ -1922,7 +2008,8 @@ mod integration {
         svc
     }
 
-    /// Registers a document via `textDocument/didOpen` so it's available in `state.docs`.
+    /// Registers a document via `textDocument/didOpen` so it's available in
+    /// `state.docs`.
     async fn open(svc: &mut Svc, uri: &str, text: &str) {
         drop(
             call_inner(
@@ -1944,7 +2031,8 @@ mod integration {
         );
     }
 
-    /// Replaces a document's full text via `textDocument/didChange` (FULL sync: one change, no range).
+    /// Replaces a document's full text via `textDocument/didChange` (FULL sync: one
+    /// change, no range).
     async fn change(svc: &mut Svc, uri: &str, text: &str) {
         drop(
             call_inner(
@@ -1979,8 +2067,9 @@ mod integration {
         );
     }
 
-    /// Toggles a word on/off via `workspace/executeCommand` -> `zed-highlight.toggle`.
-    /// (`id` must be unique per test to satisfy the JSON-RPC request/response pairing).
+    /// Toggles a word on/off via `workspace/executeCommand` ->
+    /// `zed-highlight.toggle`. (`id` must be unique per test to satisfy the
+    /// JSON-RPC request/response pairing).
     async fn toggle(svc: &mut Svc, id: u32, word: &str) {
         drop(
             call_inner(
@@ -1999,7 +2088,8 @@ mod integration {
         );
     }
 
-    /// Removes all highlighted words via `workspace/executeCommand` -> `zed-highlight.clear`.
+    /// Removes all highlighted words via `workspace/executeCommand` ->
+    /// `zed-highlight.clear`.
     async fn clear(svc: &mut Svc, id: u32) {
         drop(
             call_inner(
@@ -2017,7 +2107,8 @@ mod integration {
         );
     }
 
-    /// Requests code actions at the given cursor position and returns their titles in order.
+    /// Requests code actions at the given cursor position and returns their titles
+    /// in order.
     async fn code_action(
         svc: &mut Svc,
         id: u32,
@@ -2053,7 +2144,8 @@ mod integration {
             .unwrap_or_default()
     }
 
-    /// Requests code actions for a given selection range and returns their titles in order.
+    /// Requests code actions for a given selection range and returns their titles
+    /// in order.
     async fn code_action_range(
         svc: &mut Svc,
         id: u32,
@@ -2091,8 +2183,9 @@ mod integration {
             .unwrap_or_default()
     }
 
-    /// Requests the full semantic token list for a document and returns the raw flat `data` array. Each token is
-    /// encoded as 5 consecutive u32s: `delta_line`, `delta_start`, `length`, `token_type`, `token_modifiers`.
+    /// Requests the full semantic token list for a document and returns the raw
+    /// flat `data` array. Each token is encoded as 5 consecutive u32s:
+    /// `delta_line`, `delta_start`, `length`, `token_type`, `token_modifiers`.
     async fn get_tokens(svc: &mut Svc, id: u32, uri: &str) -> Vec<u32> {
         let res = call_inner(
             svc,
@@ -2115,8 +2208,9 @@ mod integration {
             .collect()
     }
 
-    /// Converts the flat token array into (`delta_line`, `delta_start`, `length`, `token_type`) 4-tuples,
-    /// dropping the always-zero `token_modifiers_bitset` field.
+    /// Converts the flat token array into (`delta_line`, `delta_start`, `length`,
+    /// `token_type`) 4-tuples, dropping the always-zero `token_modifiers_bitset`
+    /// field.
     fn decode_tokens(data: &[u32]) -> Vec<(u32, u32, u32, u32)> {
         data.as_chunks::<5>()
             .0
@@ -2136,7 +2230,8 @@ mod integration {
         assert!(data.is_empty(), "no tokens when no words are highlighted");
     }
 
-    /// End-to-end smoke test: one word toggled, one occurrence in document -> verify exact 5-tuple encoding.
+    /// End-to-end smoke test: one word toggled, one occurrence in document ->
+    /// verify exact 5-tuple encoding.
     #[tokio::test]
     async fn tokens_single_word_single_occurrence() {
         let mut svc = make_service().await;
@@ -2150,7 +2245,8 @@ mod integration {
         );
     }
 
-    /// When two tokens share a line, the second token's `delta_start` is relative to the first token's start column.
+    /// When two tokens share a line, the second token's `delta_start` is relative
+    /// to the first token's start column.
     #[tokio::test]
     async fn tokens_same_line_delta_encoding() {
         let mut svc = make_service().await;
@@ -2164,8 +2260,9 @@ mod integration {
         );
     }
 
-    /// When a token is on a different line than the previous one, `delta_start` resets to the absolute column rather
-    /// than being relative to the previous token. This is mandated by the LSP spec.
+    /// When a token is on a different line than the previous one, `delta_start`
+    /// resets to the absolute column rather than being relative to the previous
+    /// token. This is mandated by the LSP spec.
     #[tokio::test]
     async fn tokens_cross_line_delta_encoding() {
         let mut svc = make_service().await;
@@ -2179,8 +2276,9 @@ mod integration {
         );
     }
 
-    /// Each word occupies its own slot in `state.words`; the slot index maps to a distinct token type, which Zed
-    /// resolves to a different highlight color via `semantic_token_rules`.
+    /// Each word occupies its own slot in `state.words`; the slot index maps to a
+    /// distinct token type, which Zed resolves to a different highlight color via
+    /// `semantic_token_rules`.
     #[tokio::test]
     async fn tokens_two_words_get_distinct_types() {
         let mut svc = make_service().await;
@@ -2196,7 +2294,8 @@ mod integration {
         );
     }
 
-    /// A second toggle on the same word soft-deletes it (sets its slot to `None`); `build_tokens` skips `None` slots.
+    /// A second toggle on the same word soft-deletes it (sets its slot to `None`);
+    /// `build_tokens` skips `None` slots.
     #[tokio::test]
     async fn tokens_toggled_off_word_produces_no_tokens() {
         let mut svc = make_service().await;
@@ -2219,8 +2318,8 @@ mod integration {
         assert!(data.is_empty(), "clear must remove all highlighted words");
     }
 
-    /// `token type = slot_index % NUM_COLORS` (8), so the 9th word wraps back to type 0 and shares a color with the
-    /// first word.
+    /// `token type = slot_index % NUM_COLORS` (8), so the 9th word wraps back to
+    /// type 0 and shares a color with the first word.
     #[tokio::test]
     async fn tokens_color_wraps_past_num_colors() {
         let mut svc = make_service().await;
@@ -2234,7 +2333,8 @@ mod integration {
         assert_eq!(data[43], 0, "ninth word (w8) wraps back to token type 0");
     }
 
-    /// Default whole-word mode wraps the pattern in `\b...\b`, so "foo" does not match inside "foobar".
+    /// Default whole-word mode wraps the pattern in `\b...\b`, so "foo" does not
+    /// match inside "foobar".
     #[tokio::test]
     async fn tokens_whole_word_excludes_substrings() {
         let mut svc = make_service().await;
@@ -2248,8 +2348,9 @@ mod integration {
         );
     }
 
-    /// `textDocument/didChange` replaces the stored document text, so `build_tokens` sees the new content on the very
-    /// next `semanticTokens/full` request.
+    /// `textDocument/didChange` replaces the stored document text, so
+    /// `build_tokens` sees the new content on the very next `semanticTokens/full`
+    /// request.
     #[tokio::test]
     async fn tokens_did_change_updates_document() {
         let mut svc = make_service().await;
@@ -2269,8 +2370,9 @@ mod integration {
         );
     }
 
-    /// `textDocument/didClose` removes the document from `state.docs`; `build_tokens` returns an empty list when the
-    /// document is absent rather than panicking or returning stale data.
+    /// `textDocument/didClose` removes the document from `state.docs`;
+    /// `build_tokens` returns an empty list when the document is absent rather than
+    /// panicking or returning stale data.
     #[tokio::test]
     async fn tokens_did_close_evicts_document() {
         let mut svc = make_service().await;
@@ -2283,17 +2385,20 @@ mod integration {
         assert!(data2.is_empty(), "evicted document returns no tokens");
     }
 
-    /// The toggle code action must use a stateless title ("Toggle highlight") that stays accurate regardless of when
-    /// Zed last fetched the response. Zed caches code actions by cursor position and only invalidates that cache on
-    /// cursor movement or document edits, so a state-dependent title ("Highlight" vs "Remove highlight") would be
-    /// stale and misleading after a toggle without cursor movement. The stateless title is the server-side workaround
-    /// for the missing `workspace/codeAction/refresh` support in Zed.
+    /// The toggle code action must use a stateless title ("Toggle highlight") that
+    /// stays accurate regardless of when Zed last fetched the response. Zed caches
+    /// code actions by cursor position and only invalidates that cache on cursor
+    /// movement or document edits, so a state-dependent title ("Highlight" vs
+    /// "Remove highlight") would be stale and misleading after a toggle without
+    /// cursor movement. The stateless title is the server-side workaround for the
+    /// missing `workspace/codeAction/refresh` support in Zed.
     #[tokio::test]
     async fn code_action_title_is_stateless() {
         let mut svc = make_service().await;
         open(&mut svc, URI, "foo bar").await;
 
-        // Before and after toggling, the code action title must be the same stateless string.
+        // Before and after toggling, the code action title must be the same stateless
+        // string.
         let actions_before = code_action(&mut svc, 1, URI, 0, 0).await;
         toggle(&mut svc, 2, "foo").await;
         let actions_after = code_action(&mut svc, 3, URI, 0, 0).await;
@@ -2315,8 +2420,9 @@ mod integration {
         );
     }
 
-    /// The LSP spec requires character offsets in UTF-16 code units, not bytes. '中' and '文' are each 1 UTF-16 unit
-    /// but 3 UTF-8 bytes, so "foo" at UTF-16 offset 3 must not be reported at byte offset 7.
+    /// The LSP spec requires character offsets in UTF-16 code units, not bytes. '中'
+    /// and '文' are each 1 UTF-16 unit but 3 UTF-8 bytes, so "foo" at UTF-16 offset
+    /// 3 must not be reported at byte offset 7.
     #[tokio::test]
     async fn tokens_utf16_offsets_with_multibyte() {
         let mut svc = make_service().await;
@@ -2330,7 +2436,8 @@ mod integration {
         );
     }
 
-    /// Cursor on a space (non-word character) must produce no code actions when no words are highlighted.
+    /// Cursor on a space (non-word character) must produce no code actions when no
+    /// words are highlighted.
     #[tokio::test]
     async fn code_action_no_actions_when_cursor_on_space() {
         let mut svc = make_service().await;
@@ -2340,7 +2447,8 @@ mod integration {
         assert!(actions.is_empty(), "no actions when cursor is on a space");
     }
 
-    /// The "Clear all highlights" action must not appear when no words are currently highlighted.
+    /// The "Clear all highlights" action must not appear when no words are
+    /// currently highlighted.
     #[tokio::test]
     async fn code_action_no_clear_action_when_no_highlights() {
         let mut svc = make_service().await;
@@ -2358,7 +2466,8 @@ mod integration {
         );
     }
 
-    /// After toggling a word on, both the toggle and clear actions must be offered together.
+    /// After toggling a word on, both the toggle and clear actions must be offered
+    /// together.
     #[tokio::test]
     async fn code_action_both_actions_when_word_highlighted() {
         let mut svc = make_service().await;
@@ -2377,14 +2486,15 @@ mod integration {
         );
     }
 
-    /// In whole-word mode (the default), toggling a word that starts or ends with a non-word character
-    /// must be a no-op: `is_highlightable` rejects it, the words list must not change, and no tokens
-    /// must be produced.
+    /// In whole-word mode (the default), toggling a word that starts or ends with a
+    /// non-word character must be a no-op: `is_highlightable` rejects it, the words
+    /// list must not change, and no tokens must be produced.
     #[tokio::test]
     async fn toggle_non_highlightable_word_is_no_op() {
         let mut svc = make_service().await;
         open(&mut svc, URI, "foo . bar").await;
-        // "." starts and ends with a non-word character — `is_highlightable` rejects it under whole-word matching.
+        // "." starts and ends with a non-word character — `is_highlightable` rejects it
+        // under whole-word matching.
         toggle(&mut svc, 1, ".").await;
         let data = get_tokens(&mut svc, 2, URI).await;
         assert!(
@@ -2393,8 +2503,9 @@ mod integration {
         );
     }
 
-    /// After a word is removed, the next new word reuses the freed slot and therefore inherits its
-    /// color index rather than being appended at the end with a new index.
+    /// After a word is removed, the next new word reuses the freed slot and
+    /// therefore inherits its color index rather than being appended at the end
+    /// with a new index.
     #[tokio::test]
     async fn tokens_color_reuse_after_remove() {
         let mut svc = make_service().await;
@@ -2412,8 +2523,9 @@ mod integration {
         );
     }
 
-    /// Two highlighted words can produce overlapping tokens at the same position (e.g., "foo" and "foo.bar"). They
-    /// must be emitted in a deterministic order: shorter token first, then lower token type.
+    /// Two highlighted words can produce overlapping tokens at the same position
+    /// (e.g., "foo" and "foo.bar"). They must be emitted in a deterministic order:
+    /// shorter token first, then lower token type.
     #[tokio::test]
     async fn tokens_overlapping_at_same_start_are_deterministically_ordered() {
         let mut svc = make_service().await;
@@ -2429,8 +2541,9 @@ mod integration {
         );
     }
 
-    /// Highlights are global across all open documents: toggling a word must produce tokens in every
-    /// document that contains it, not only the one where the action was invoked.
+    /// Highlights are global across all open documents: toggling a word must
+    /// produce tokens in every document that contains it, not only the one where
+    /// the action was invoked.
     #[tokio::test]
     async fn tokens_multiple_documents() {
         let mut svc = make_service().await;
@@ -2464,8 +2577,9 @@ mod integration {
         );
     }
 
-    /// Emoji (U+1F600) occupy two UTF-16 code units (a surrogate pair). A token following an emoji
-    /// must report the correct UTF-16 `delta_start`, not the byte offset.
+    /// Emoji (U+1F600) occupy two UTF-16 code units (a surrogate pair). A token
+    /// following an emoji must report the correct UTF-16 `delta_start`, not the
+    /// byte offset.
     #[tokio::test]
     async fn tokens_surrogate_pair_utf16_offset() {
         let mut svc = make_service().await;
@@ -2481,14 +2595,15 @@ mod integration {
         );
     }
 
-    /// A non-empty single-line selection must be used verbatim as the highlight target, bypassing the
-    /// cursor-to-word-boundary scan. This matters for selections that include non-word characters such
-    /// as dots that the cursor scan would not span.
+    /// A non-empty single-line selection must be used verbatim as the highlight
+    /// target, bypassing the cursor-to-word-boundary scan. This matters for
+    /// selections that include non-word characters such as dots that the cursor
+    /// scan would not span.
     #[tokio::test]
     async fn code_action_selection_uses_selected_text() {
         let mut svc = make_service().await;
-        // "foo.bar" selected in full (chars 0..7). The dot makes the cursor scan stop at "foo",
-        // but the selection path must return the full selected text.
+        // "foo.bar" selected in full (chars 0..7). The dot makes the cursor scan stop
+        // at "foo", but the selection path must return the full selected text.
         open(&mut svc, URI, "foo.bar").await;
         let actions = code_action_range(&mut svc, 1, URI, 0, 0, 0, 7).await;
         assert!(
@@ -2499,8 +2614,9 @@ mod integration {
         );
     }
 
-    /// A decomposed (NFD) word like "cafe" + U+0301 must be offered as a whole and highlighted as a whole. Splitting it
-    /// at the combining mark would produce "cafe", whose `\bcafe\b` pattern never matches because U+0301 is a word
+    /// A decomposed (NFD) word like "cafe" + U+0301 must be offered as a whole and
+    /// highlighted as a whole. Splitting it at the combining mark would produce
+    /// "cafe", whose `\bcafe\b` pattern never matches because U+0301 is a word
     /// character for the regex engine, so no toggle action would be offered at all.
     #[tokio::test]
     async fn decomposed_word_is_offered_and_highlighted() {
@@ -2522,8 +2638,9 @@ mod integration {
         );
     }
 
-    /// A word followed by a non-letter number (e.g., "x²") must be offered without it: `\bx²\b` never matches
-    /// "x² = 1" because the regex engine sees no word boundary after '²', while `\bx\b` does.
+    /// A word followed by a non-letter number (e.g., "x²") must be offered without
+    /// it: `\bx²\b` never matches "x² = 1" because the regex engine sees no word
+    /// boundary after '²', while `\bx\b` does.
     #[tokio::test]
     async fn word_before_superscript_is_offered_without_it() {
         let mut svc = make_service().await;
