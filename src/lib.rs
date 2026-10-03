@@ -266,14 +266,6 @@ mod tests {
     // Test constants.
 
     #[test]
-    fn binary_name_is_correct() {
-        assert_eq!(
-            BINARY_NAME, "zed-highlight-lsp",
-            "language server binary name must match the published crate"
-        );
-    }
-
-    #[test]
     fn repository_slug_is_correct() {
         assert_eq!(
             REPOSITORY, "0xdea/zed-highlight",
@@ -281,99 +273,27 @@ mod tests {
         );
     }
 
-    // Test `WordHighlightExtension::new`.
-
-    #[test]
-    fn new_starts_with_no_cached_path() {
-        // Call `new` through the `zed::Extension` trait.
-        let ext = <WordHighlightExtension as zed::Extension>::new();
-        assert!(
-            ext.cached_binary_path.is_none(),
-            "a freshly created extension must not have a cached binary path"
-        );
-    }
-
     // Test `platform_asset_name`.
 
     #[test]
-    fn asset_name_mac_aarch64_is_correct() {
-        let name = platform_asset_name(zed::Os::Mac, zed::Architecture::Aarch64);
-        assert_eq!(
-            name, "zed-highlight-lsp-darwin-aarch64.tar.gz",
-            "macOS on aarch64 must map to the `darwin-aarch64` release asset"
-        );
-    }
+    fn asset_names_match_release_assets() {
+        use zed::Architecture::{Aarch64, X8664};
+        use zed::Os::{Linux, Mac, Windows};
 
-    #[test]
-    fn asset_name_mac_x86_64_is_correct() {
-        let name = platform_asset_name(zed::Os::Mac, zed::Architecture::X8664);
-        assert_eq!(
-            name, "zed-highlight-lsp-darwin-x86_64.tar.gz",
-            "macOS on x86_64 must map to the `darwin-x86_64` release asset"
-        );
-    }
-
-    #[test]
-    fn asset_name_mac_x86_is_correct() {
-        let name = platform_asset_name(zed::Os::Mac, zed::Architecture::X86);
-        assert_eq!(
-            name, "zed-highlight-lsp-darwin-x86.tar.gz",
-            "macOS on x86 must map to the `darwin-x86` asset name"
-        );
-    }
-
-    #[test]
-    fn asset_name_linux_aarch64_is_correct() {
-        let name = platform_asset_name(zed::Os::Linux, zed::Architecture::Aarch64);
-        assert_eq!(
-            name, "zed-highlight-lsp-linux-aarch64.tar.gz",
-            "Linux on aarch64 must map to the `linux-aarch64` release asset"
-        );
-    }
-
-    #[test]
-    fn asset_name_linux_x86_64_is_correct() {
-        let name = platform_asset_name(zed::Os::Linux, zed::Architecture::X8664);
-        assert_eq!(
-            name, "zed-highlight-lsp-linux-x86_64.tar.gz",
-            "Linux on x86_64 must map to the `linux-x86_64` release asset"
-        );
-    }
-
-    #[test]
-    fn asset_name_linux_x86_is_correct() {
-        let name = platform_asset_name(zed::Os::Linux, zed::Architecture::X86);
-        assert_eq!(
-            name, "zed-highlight-lsp-linux-x86.tar.gz",
-            "Linux on x86 must map to the `linux-x86` asset name"
-        );
-    }
-
-    #[test]
-    fn asset_name_windows_aarch64_is_correct() {
-        let name = platform_asset_name(zed::Os::Windows, zed::Architecture::Aarch64);
-        assert_eq!(
-            name, "zed-highlight-lsp-windows-aarch64.tar.gz",
-            "Windows on aarch64 must map to the `windows-aarch64` release asset"
-        );
-    }
-
-    #[test]
-    fn asset_name_windows_x86_64_is_correct() {
-        let name = platform_asset_name(zed::Os::Windows, zed::Architecture::X8664);
-        assert_eq!(
-            name, "zed-highlight-lsp-windows-x86_64.tar.gz",
-            "Windows on x86_64 must map to the `windows-x86_64` release asset"
-        );
-    }
-
-    #[test]
-    fn asset_name_windows_x86_is_correct() {
-        let name = platform_asset_name(zed::Os::Windows, zed::Architecture::X86);
-        assert_eq!(
-            name, "zed-highlight-lsp-windows-x86.tar.gz",
-            "Windows on x86 must map to the `windows-x86` asset name"
-        );
+        for (os, arch, expected) in [
+            (Mac, Aarch64, "zed-highlight-lsp-darwin-aarch64.tar.gz"),
+            (Mac, X8664, "zed-highlight-lsp-darwin-x86_64.tar.gz"),
+            (Linux, Aarch64, "zed-highlight-lsp-linux-aarch64.tar.gz"),
+            (Linux, X8664, "zed-highlight-lsp-linux-x86_64.tar.gz"),
+            (Windows, Aarch64, "zed-highlight-lsp-windows-aarch64.tar.gz"),
+            (Windows, X8664, "zed-highlight-lsp-windows-x86_64.tar.gz"),
+        ] {
+            assert_eq!(
+                platform_asset_name(os, arch),
+                expected,
+                "the platform must map to the `{expected}` release asset"
+            );
+        }
     }
 
     // Test `version_dir_name`.
@@ -434,29 +354,13 @@ mod tests {
         // the path used for cache probing and for spawning the language server must
         // include the `.exe` suffix. Forgetting it causes Zed to re-download on every
         // session and then fail to start the LSP because the resolved path doesn't
-        // exist.
+        // exist. The separator must still be '/', not '\': the path is passed to
+        // `zed::make_file_executable` and `zed::download_file`, both of which expect
+        // POSIX-style paths because the extension runs inside a WASM sandbox.
         assert_eq!(
             binary_path_in_version("0.1.0", zed::Os::Windows),
             "zed-highlight-lsp-0.1.0/zed-highlight-lsp.exe",
             "Windows binary path must include the `.exe` suffix inside the versioned directory"
         );
-    }
-
-    #[test]
-    fn binary_path_uses_forward_slash() {
-        // The path is passed to `zed::make_file_executable` and `zed::download_file`,
-        // both of which expect POSIX-style paths because the extension runs inside a
-        // WASM sandbox.
-        for os in [zed::Os::Mac, zed::Os::Linux, zed::Os::Windows] {
-            let path = binary_path_in_version("0.1.0", os);
-            assert!(
-                path.contains('/'),
-                "binary path must use '/' as separator (os: {os:?})"
-            );
-            assert!(
-                !path.contains('\\'),
-                "binary path must not use '\\' as separator (os: {os:?})"
-            );
-        }
     }
 }

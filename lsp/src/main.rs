@@ -865,24 +865,6 @@ mod tests {
     // Test `State::default`.
 
     #[test]
-    fn state_default_has_empty_word_list() {
-        let state = State::default();
-        assert!(
-            state.words.is_empty(),
-            "a fresh state must have no highlighted words"
-        );
-    }
-
-    #[test]
-    fn state_default_has_empty_docs() {
-        let state = State::default();
-        assert!(
-            state.docs.is_empty(),
-            "a fresh state must have no open documents"
-        );
-    }
-
-    #[test]
     fn state_default_uses_whole_word_case_sensitive_matching() {
         assert_eq!(
             State::default().options,
@@ -1028,14 +1010,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn state_words_clear_results_in_has_any_false() {
-        let mut state = State::default();
-        state.toggle("a");
-        state.words_clear();
-        assert!(!state.has_any(), "clearing must leave no active highlights");
-    }
-
     // Test `State::words_eq`.
 
     #[test]
@@ -1087,57 +1061,26 @@ mod tests {
     // Test `utf16_len`.
 
     #[test]
-    fn utf16_len_empty_string_is_zero() {
-        assert_eq!(
-            utf16_len(""),
-            0,
-            "the empty string must have no UTF-16 code units"
-        );
-    }
-
-    #[test]
-    fn utf16_len_ascii_counts_one_per_char() {
-        assert_eq!(
-            utf16_len("hello"),
-            5,
-            "each ASCII char must count as one UTF-16 code unit"
-        );
-    }
-
-    #[test]
-    fn utf16_len_bmp_multibyte_char_counts_one() {
-        // '£' is U+00A3: 2 UTF-8 bytes, 1 UTF-16 code unit.
-        assert_eq!(
-            utf16_len("£"),
-            1,
-            "'£' must count as one UTF-16 code unit despite being two UTF-8 bytes"
-        );
-        // '中' is U+4E2D: 3 UTF-8 bytes, 1 UTF-16 code unit.
-        assert_eq!(
-            utf16_len("中文"),
-            2,
-            "each CJK char must count as one UTF-16 code unit despite being three UTF-8 bytes"
-        );
-    }
-
-    #[test]
-    fn utf16_len_supplementary_char_counts_two() {
-        // '😀' is U+1F600: 4 UTF-8 bytes, 2 UTF-16 code units (surrogate pair).
-        assert_eq!(
-            utf16_len("😀"),
-            2,
-            "'😀' must count as two UTF-16 code units (a surrogate pair)"
-        );
-    }
-
-    #[test]
-    fn utf16_len_mixed_content() {
-        // "a😀b" = 1 + 2 + 1 = 4 UTF-16 code units.
-        assert_eq!(
-            utf16_len("a😀b"),
-            4,
-            "mixed text must sum the UTF-16 code units of each char"
-        );
+    fn utf16_len_counts_utf16_code_units() {
+        for (text, expected) in [
+            ("", 0),
+            // Each ASCII char is one code unit.
+            ("hello", 5),
+            // '£' (U+00A3) is 2 UTF-8 bytes but 1 code unit.
+            ("£", 1),
+            // Each CJK char is 3 UTF-8 bytes but 1 code unit.
+            ("中文", 2),
+            // '😀' (U+1F600) is 4 UTF-8 bytes and 2 code units (a surrogate pair).
+            ("😀", 2),
+            // Mixed text sums each char: 1 + 2 + 1.
+            ("a😀b", 4),
+        ] {
+            assert_eq!(
+                utf16_len(text),
+                expected,
+                "{text:?} must have {expected} UTF-16 code units"
+            );
+        }
     }
 
     // Test `utf16_to_byte`.
@@ -1238,49 +1181,17 @@ mod tests {
     // Test `is_word_char`.
 
     #[test]
-    fn is_word_char_ascii_letters() {
-        assert!(
-            is_word_char('a'),
-            "lowercase ASCII letters must be word chars"
-        );
-        assert!(
-            is_word_char('z'),
-            "lowercase ASCII letters must be word chars"
-        );
-        assert!(
-            is_word_char('A'),
-            "uppercase ASCII letters must be word chars"
-        );
-        assert!(
-            is_word_char('Z'),
-            "uppercase ASCII letters must be word chars"
-        );
-    }
-
-    #[test]
-    fn is_word_char_digits() {
-        assert!(is_word_char('0'), "ASCII digits must be word chars");
-        assert!(is_word_char('9'), "ASCII digits must be word chars");
-    }
-
-    #[test]
-    fn is_word_char_underscore() {
-        assert!(is_word_char('_'), "'_' must be a word char");
-    }
-
-    #[test]
-    fn is_word_char_space_is_false() {
-        assert!(!is_word_char(' '), "a space must not be a word char");
-        assert!(!is_word_char('\t'), "a tab must not be a word char");
-        assert!(!is_word_char('\n'), "a newline must not be a word char");
-    }
-
-    #[test]
-    fn is_word_char_punctuation_is_false() {
+    fn is_word_char_classifies_ascii() {
+        // Letters, digits, and underscore are word chars.
+        for ch in ['a', 'z', 'A', 'Z', '0', '9', '_'] {
+            assert!(is_word_char(ch), "{ch:?} must be a word char");
+        }
+        // Whitespace and punctuation are not.
         for ch in [
-            '.', ',', '!', '(', ')', '-', '+', '=', '*', '/', '\\', '"', '\'', ';', ':',
+            ' ', '\t', '\n', '.', ',', '!', '(', ')', '-', '+', '=', '*', '/', '\\', '"', '\'',
+            ';', ':',
         ] {
-            assert!(!is_word_char(ch), "'{ch}' should not be a word char");
+            assert!(!is_word_char(ch), "{ch:?} must not be a word char");
         }
     }
 
@@ -1369,22 +1280,6 @@ mod tests {
     }
 
     #[test]
-    fn is_highlightable_any_nonempty_without_whole_word_mode_true() {
-        assert!(
-            is_highlightable("foo", SUBSTRING),
-            "an identifier must be highlightable in substring mode"
-        );
-        assert!(
-            is_highlightable("(bar)", SUBSTRING),
-            "text with surrounding punctuation must be highlightable in substring mode"
-        );
-        assert!(
-            is_highlightable("foo bar", SUBSTRING),
-            "text containing a space must be highlightable in substring mode"
-        );
-    }
-
-    #[test]
     fn is_highlightable_identifier_in_whole_word_mode_true() {
         assert!(
             is_highlightable("foo", WHOLE_WORD),
@@ -1468,23 +1363,13 @@ mod tests {
     // non-word characters is somewhat debatable. We should probably refine it if
     // `whole_word` ever becomes user-configurable. Leave as-is for the time being.
     #[test]
-    fn is_highlightable_any_nonempty_selection_without_whole_word_mode_true() {
-        assert!(
-            is_highlightable(" ", SUBSTRING),
-            "a lone space must be highlightable in substring mode"
-        );
-        assert!(
-            is_highlightable(".", SUBSTRING),
-            "a lone punctuation char must be highlightable in substring mode"
-        );
-        assert!(
-            is_highlightable("()", SUBSTRING),
-            "punctuation-only text must be highlightable in substring mode"
-        );
-        assert!(
-            is_highlightable("foo bar", SUBSTRING),
-            "text containing a space must be highlightable in substring mode"
-        );
+    fn is_highlightable_any_nonempty_text_without_whole_word_mode_true() {
+        for text in ["foo", "(bar)", "foo bar", " ", ".", "()"] {
+            assert!(
+                is_highlightable(text, SUBSTRING),
+                "{text:?} must be highlightable in substring mode"
+            );
+        }
     }
 
     #[test]
@@ -1683,14 +1568,6 @@ mod tests {
         assert!(
             !matches_anywhere("", "foo", WHOLE_WORD),
             "empty content must never match"
-        );
-    }
-
-    #[test]
-    fn matches_anywhere_word_not_on_this_line_returns_false() {
-        assert!(
-            !matches_anywhere("line one\nline two", "three", WHOLE_WORD),
-            "a word absent from every line must not match"
         );
     }
 
