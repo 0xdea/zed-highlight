@@ -36,7 +36,7 @@ cargo install zed-highlight-lsp --locked
 Alternatively, you can build it from [source](https://github.com/0xdea/zed-highlight):
 
 ```sh
-git clone https://github.com/0xdea/zed-highlight
+git clone --depth 1 https://github.com/0xdea/zed-highlight
 cd zed-highlight
 cargo install --path lsp --locked
 ```

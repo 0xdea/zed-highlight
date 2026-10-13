@@ -48,7 +48,7 @@ The easiest way to install the Word Highlight extension is via Zed's [extension 
 Alternatively, you can clone the repository and install both the extension and the LSP server manually. First, build the LSP server from source and install it:
 
 ```sh
-git clone https://github.com/0xdea/zed-highlight
+git clone --depth 1 https://github.com/0xdea/zed-highlight
 cd zed-highlight
 cargo install --path lsp --locked
 ```
