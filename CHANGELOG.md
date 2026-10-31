@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidate redundant tests into table-driven tests and remove tests with no value.
 - Update dependencies.
 
+### Fixed
+
+- Fall back to uncached builds in CI when sccache fails to start.
+
 ## [0.1.5] - 2026-09-28
 
 ### Added
