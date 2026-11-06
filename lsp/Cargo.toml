@@ -19,7 +19,7 @@ regex = "1.12"
 regex-syntax = { version = "0.8", features = ["unicode-perl"] }
 
 [dev-dependencies]
-tower = "0.4" # tower-lsp depends on this version of tower
+tower = "0.5" # tower-lsp depends on this version of tower
 
 [[bin]]
 name = "zed-highlight-lsp"
