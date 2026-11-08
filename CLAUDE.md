@@ -35,14 +35,14 @@ cargo install --path lsp --locked
 
 Two CI workflows live in `.github/workflows/`:
 
-- `build.yml` — runs on every push to `master`: on Linux, fmt, build, clippy (warnings-as-errors), `cargo audit`, `cargo doc` (rustdoc warnings-as-errors), test, and the wasm extension build; macOS and Windows only run test+build. Zizmor is also run against all workflows. Match these locally before pushing.
-- `release.yml` — triggers on `v*` tags: cross-compiles the LSP binary for all platforms and publishes a GitHub Release with the archives.
+- `build.yml` — runs on pushes and PRs to `master` (and manually): on Linux, fmt, build, clippy (warnings-as-errors), `cargo audit`, `cargo doc` (rustdoc warnings-as-errors), test, and the wasm extension build; macOS and Windows run test, build, and the wasm extension build. A separate job runs zizmor against all workflows. Match these locally before pushing.
+- `release.yml` — triggers on `v*` tags (or manually): builds the LSP binary for x86_64/aarch64 Linux (via `cross`), macOS, and Windows, and publishes a GitHub Release with the archives.
 
-Dependency updates are managed via `.github/dependabot.yml` (Cargo + GitHub Actions, grouped, with a 10-day cooldown).
+Dependency updates are managed via `.github/dependabot.yml` (Cargo + GitHub Actions, weekly; Actions updates grouped; 10-day cooldown).
 
 ## Lint posture
 
-The workspace `[lints]` table in `Cargo.toml` enables clippy `all`, `pedantic`, `nursery`, `cargo`, plus a long list of restriction lints (`unwrap_used`, `expect_used`, `panic`, `todo`, `unreachable`, `exhaustive_enums`/`structs`, `missing_docs_in_private_items`, `undocumented_unsafe_blocks`, `str_to_string`, etc.). Treat these as part of the contract:
+The workspace `[lints]` table in `Cargo.toml` enables clippy `all`, `pedantic`, `nursery`, `cargo`, and the entire `restriction` group (all at `warn`, made fatal by `-D warnings` in CI), minus an explicit allowlist — so restriction lints such as `unwrap_used`, `expect_used`, `panic`, `todo`, `unreachable`, `exhaustive_enums`/`structs`, `missing_docs_in_private_items`, `undocumented_unsafe_blocks`, `str_to_string` are active. Check the allowlist before suppressing anything. Treat these as part of the contract:
 
 - Every item, including private ones, needs a doc comment.
 - Don't add `unwrap()`, `expect()`, `panic!`, `todo!`, `unreachable!`, or `dbg!` — clippy will fail CI.
