@@ -2011,14 +2011,11 @@ mod integration {
         )
         .await
         .unwrap();
-        res["result"]
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|action| action["title"].as_str().map(str::to_owned))
-                    .collect()
-            })
-            .unwrap_or_default()
+        res["result"].as_array().map_or_default(|arr| {
+            arr.iter()
+                .filter_map(|action| action["title"].as_str().map(str::to_owned))
+                .collect()
+        })
     }
 
     /// Requests code actions for a given selection range and returns their titles
@@ -2050,14 +2047,11 @@ mod integration {
         )
         .await
         .unwrap();
-        res["result"]
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|action| action["title"].as_str().map(str::to_owned))
-                    .collect()
-            })
-            .unwrap_or_default()
+        res["result"].as_array().map_or_default(|arr| {
+            arr.iter()
+                .filter_map(|action| action["title"].as_str().map(str::to_owned))
+                .collect()
+        })
     }
 
     /// Requests the full semantic token list for a document and returns the raw
