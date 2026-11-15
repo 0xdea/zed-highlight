@@ -17,7 +17,7 @@ The extension WASM and the LSP binary are independent build artifacts. End users
 # Format / lint / build (workspace-wide). The root is a non-virtual workspace, so `--workspace` is required: without
 # it, clippy/build/test only cover the root extension crate and skip `lsp`.
 cargo fmt --all --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
+CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo build --workspace --locked
 cargo test --workspace --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
@@ -35,14 +35,14 @@ cargo install --path lsp --locked
 
 Two CI workflows live in `.github/workflows/`:
 
-- `build.yml` — runs on pushes and PRs to `master` (and manually): on Linux, fmt, build, clippy (warnings-as-errors), `cargo audit`, `cargo doc` (rustdoc warnings-as-errors), test, and the wasm extension build; macOS and Windows run test, build, and the wasm extension build. A separate job runs zizmor against all workflows. Match these locally before pushing.
+- `build.yml` — runs on pushes and PRs to `master` (and manually): on Linux, fmt, build, clippy (warnings-as-errors, Cargo lints included), `cargo audit`, `cargo doc` (rustdoc warnings-as-errors), test, and the wasm extension build; macOS and Windows run test, build, and the wasm extension build. A separate job runs zizmor against all workflows. Match these locally before pushing.
 - `release.yml` — triggers on `v*` tags (or manually): builds the LSP binary for x86_64/aarch64 Linux (via `cross`), macOS, and Windows, and publishes a GitHub Release with the archives.
 
 Dependency updates are managed via `.github/dependabot.yml` (Cargo + GitHub Actions, weekly; Actions updates grouped; 10-day cooldown).
 
 ## Lint posture
 
-The workspace `[lints]` table in `Cargo.toml` enables clippy `all`, `pedantic`, `nursery`, `cargo`, and the entire `restriction` group (all at `warn`, made fatal by `-D warnings` in CI), minus an explicit allowlist — so restriction lints such as `unwrap_used`, `expect_used`, `panic`, `todo`, `unreachable`, `exhaustive_enums`/`structs`, `missing_docs_in_private_items`, `undocumented_unsafe_blocks`, `str_to_string` are active. Check the allowlist before suppressing anything. Treat these as part of the contract:
+The workspace `[lints]` table in `Cargo.toml` enables clippy `all`, `pedantic`, `nursery`, `cargo`, and the entire `restriction` group (all at `warn`, made fatal by `-D warnings` in CI), minus an explicit allowlist — so restriction lints such as `unwrap_used`, `expect_used`, `panic`, `todo`, `unreachable`, `exhaustive_enums`/`structs`, `missing_docs_in_private_items`, `undocumented_unsafe_blocks`, `str_to_string` are active. Check the allowlist before suppressing anything. `[workspace.lints.cargo]` likewise enables Cargo's `default`, `pedantic`, and `restriction` lint groups (manifest checks such as unused dependencies), minus the snake_case naming lints, which contradict the kebab-case ones. Treat these as part of the contract:
 
 - Every item, including private ones, needs a doc comment.
 - Don't add `unwrap()`, `expect()`, `panic!`, `todo!`, `unreachable!`, or `dbg!` — clippy will fail CI.

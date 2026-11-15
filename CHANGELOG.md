@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve code style.
 - Consolidate redundant tests into table-driven tests and remove tests with no value.
 - Update dependencies.
+- Enable Cargo lints and fail CI on their warnings.
 
 ### Fixed
 
