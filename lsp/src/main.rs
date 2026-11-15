@@ -807,7 +807,6 @@ async fn main() {
 
 /// Unit tests.
 #[cfg(test)]
-#[expect(clippy::unwrap_used, reason = "tests can use `unwrap`")]
 #[expect(
     clippy::non_ascii_literal,
     reason = "test data contains non-ASCII characters"
@@ -1819,7 +1818,6 @@ mod tests {
 
 /// Integration tests.
 #[cfg(test)]
-#[expect(clippy::unwrap_used, reason = "tests can use `unwrap`")]
 #[expect(
     clippy::non_ascii_literal,
     reason = "test data contains non-ASCII characters"

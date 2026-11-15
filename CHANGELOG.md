@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidate redundant tests into table-driven tests and remove tests with no value.
 - Update dependencies.
 - Enable Cargo lints and fail CI on their warnings.
+- Allow `unwrap`, `expect`, `panic!`, and indexing in tests via `clippy.toml`.
 
 ### Fixed
 
