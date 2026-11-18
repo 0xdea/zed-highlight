@@ -4,8 +4,8 @@
 [![](https://img.shields.io/crates/v/zed-highlight-lsp?style=flat&color=green)](https://crates.io/crates/zed-highlight-lsp)
 [![](https://img.shields.io/crates/d/zed-highlight-lsp?style=flat&color=red)](https://crates.io/crates/zed-highlight-lsp)
 [![](https://img.shields.io/badge/mastodon-%40raptor-blue.svg)](https://infosec.exchange/@raptor)
-[![build](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
-[![release](https://github.com/0xdea/zed-highlight/actions/workflows/release.yml/badge.svg)](https://github.com/0xdea/zed-highlight/actions/workflows/release.yml)
+[![build](https://img.shields.io/github/actions/workflow/status/0xdea/zed-highlight/build.yml?label=build)](https://github.com/0xdea/zed-highlight/actions/workflows/build.yml)
+[![release](https://img.shields.io/github/actions/workflow/status/0xdea/zed-highlight/release.yml?label=release)](https://github.com/0xdea/zed-highlight/actions/workflows/release.yml)
 
 > "Free as in use-after."
 >
