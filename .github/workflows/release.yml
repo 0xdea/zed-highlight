@@ -60,6 +60,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           cache: false
+          build-warnings: warn
       - name: build
         if: matrix.os != 'ubuntu-latest'
         env:
